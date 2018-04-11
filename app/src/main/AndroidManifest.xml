@@ -25,7 +25,7 @@
             android:name="com.google.android.gms.vision.DEPENDENCIES"
             android:value="barcode" />
 
-        <activity android:name=".PairingActivity"></activity>
+        <activity android:name=".ScanQrActivity"></activity>
     </application>
 
 </manifest>

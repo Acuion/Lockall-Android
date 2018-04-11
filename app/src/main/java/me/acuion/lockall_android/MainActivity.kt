@@ -6,8 +6,10 @@ import android.os.Bundle
 import android.util.Base64
 import android.widget.Toast
 import kotlinx.android.synthetic.main.activity_main.*
+import java.io.FileInputStream
 import java.net.Inet4Address
 import java.nio.charset.Charset
+import java.security.KeyStore
 
 class MainActivity : Activity() {
 
@@ -15,18 +17,20 @@ class MainActivity : Activity() {
         when(requestCode) {
             42 -> {
                 runOnUiThread {
-                    val base64FromQr = data!!.extras.getString("qr")
-                    var qrBytes : ByteArray
+                    val base64FromQr = data!!.extras.getString("data")
+                    val qrBytes : ByteArray
                     try {
                         qrBytes = Base64.decode(base64FromQr, 0)
                     } catch (ex : IllegalArgumentException) {
-                        Toast.makeText(applicationContext, "Base64 decode failed", Toast.LENGTH_LONG).show() // debug
+                        Toast.makeText(applicationContext, "Base64 decode failed", Toast.LENGTH_LONG).show()
                         return@runOnUiThread
                     }
-                    val key = qrBytes.sliceArray(IntRange(0, 31))
-                    val localIp = Inet4Address.getByAddress(qrBytes.sliceArray(IntRange(32, 35)))
-                    val username = String(qrBytes.sliceArray(IntRange(36, qrBytes.size - 1)), Charset.forName("UTF-8"))
-                    Toast.makeText(applicationContext, "Success: $username at $localIp", Toast.LENGTH_LONG).show()
+
+                    // 4len + fc
+                    // 4len + sc
+                    // 4ip
+                    // 4port
+                    // {rest} - machine+username
                 }
             }
         }
@@ -37,7 +41,8 @@ class MainActivity : Activity() {
         setContentView(R.layout.activity_main)
 
         buttonPair.setOnClickListener {
-            var qrIntent = Intent(applicationContext, PairingActivity::class.java)
+            val qrIntent = Intent(applicationContext, ScanQrActivity::class.java)
+            qrIntent.putExtra("prefix", "PAIRING")
             startActivityForResult(qrIntent, 42)
         }
     }

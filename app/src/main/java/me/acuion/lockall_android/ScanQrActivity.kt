@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.util.Log
 import android.view.SurfaceHolder
 import com.google.android.gms.vision.CameraSource
 import com.google.android.gms.vision.Detector
@@ -12,7 +13,7 @@ import com.google.android.gms.vision.barcode.BarcodeDetector
 import kotlinx.android.synthetic.main.activity_pairing.*
 import java.io.IOException
 
-class PairingActivity : Activity() {
+class ScanQrActivity : Activity() {
 
     lateinit var qrDetecor : BarcodeDetector
     lateinit var cameraSource: CameraSource
@@ -37,6 +38,8 @@ class PairingActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_pairing)
+
+        val expectedPrefix = intent.getStringExtra("prefix")
 
         qrDetecor = BarcodeDetector.Builder(this).setBarcodeFormats(Barcode.QR_CODE).build()
         cameraSource = CameraSource.Builder(this, qrDetecor).setRequestedPreviewSize(640, 480).setAutoFocusEnabled(true).build()
@@ -73,8 +76,13 @@ class PairingActivity : Activity() {
                     }
                     return
                 }
-                var resultIntent = Intent()
-                resultIntent.putExtra("qr", p0.detectedItems.valueAt(0).displayValue.substring(8))
+                val resultIntent = Intent()
+                val data = p0.detectedItems.valueAt(0).displayValue.substring(8)
+                if (data.indexOf(":") == -1)
+                    return // todo
+                if (data.split(':')[0] != expectedPrefix)
+                    return
+                resultIntent.putExtra("data", data.split(':')[1])
                 setResult(RESULT_OK, resultIntent)
                 finish()
             }
