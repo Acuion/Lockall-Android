@@ -25,10 +25,16 @@ class EncryptionUtils {
             return iv
         }
 
-        fun encryptDataWithAes256(data: String, key: ByteArray, iv : ByteArray): ByteArray {
+        fun encryptDataWithAes256(data: ByteArray, key: ByteArray, iv : ByteArray): ByteArray {
             val ecipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
             ecipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
-            return ecipher.doFinal(data.toByteArray(Charset.forName("UTF-8")))
+            return ecipher.doFinal(data)
+        }
+
+        fun decryptDataWithAes256(data: ByteArray, key: ByteArray, iv : ByteArray): ByteArray {
+            val ecipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            ecipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
+            return ecipher.doFinal(data)
         }
     }
 }
