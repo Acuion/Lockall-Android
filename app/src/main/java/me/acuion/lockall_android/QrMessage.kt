@@ -21,7 +21,7 @@ import java.nio.ByteOrder
 // host's port 4 bytes
 // user data...
 
-class QrContent(base64Data: String) {
+class QrMessage(base64Data: String) {
     val firstComponent : ByteArray?
     val secondComponent : ByteArray
     val hostAddress : InetAddress

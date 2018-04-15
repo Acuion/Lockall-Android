@@ -3,17 +3,11 @@ package me.acuion.lockall_android
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.util.Base64
-import android.widget.Toast
 import kotlinx.android.synthetic.main.activity_main.*
 import me.acuion.lockall_android.crypto.EncryptionUtils
-import java.io.FileInputStream
-import java.net.Inet4Address
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.nio.charset.Charset
-import java.security.KeyStore
 import kotlin.concurrent.thread
 
 class MainActivity : Activity() {
@@ -24,8 +18,8 @@ class MainActivity : Activity() {
                 runOnUiThread {
                     val base64FromQr = data!!.extras.getString("data")
 
-                    val qrData = QrContent(base64FromQr)
-
+                    val qrData = QrMessage(base64FromQr)
+                    //TODO("Set the first component globally")
                     val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
                             qrData.secondComponent)
                     val iv = EncryptionUtils.generate128bitIv()
