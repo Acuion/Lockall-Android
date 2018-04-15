@@ -40,7 +40,8 @@ class QrContent(base64Data : String) {
             TODO("Read associated first component")
         }
 
-        val userBytes = ByteBuffer.wrap(EncryptionUtils.decryptDataWithAes256(key, iv, encryptedBody))
+        val userBytes = ByteBuffer.wrap(EncryptionUtils.decryptDataWithAes256(encryptedBody, key, iv))
+        userBytes.order(ByteOrder.LITTLE_ENDIAN)
         val hostIpBytes = ByteArray(4)
         userBytes.get(hostIpBytes)
         hostAddress = InetAddress.getByAddress(hostIpBytes)
