@@ -7,7 +7,21 @@ import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class QrContent(base64Data : String) {
+// QR:
+// 00/01 - safe or unsafe (without the first component or with)
+// if unsafe, then the first component's length 4 bytes and the first component itself
+// the second component length 4 bytes
+// the second component itself
+// IV 16 bytes
+// the encrypted body length
+// the encrypted body itself
+
+// Unencrypted body:
+// host's ip 4 bytes
+// host's port 4 bytes
+// user data...
+
+class QrContent(base64Data: String) {
     val firstComponent : ByteArray?
     val secondComponent : ByteArray
     val hostAddress : InetAddress
@@ -25,21 +39,19 @@ class QrContent(base64Data : String) {
             firstComponent = null
         }
         val scLen = qrBytes.getInt()
-        secondComponent = ByteArray(scLen) //
+        secondComponent = ByteArray(scLen)
         qrBytes.get(secondComponent)
         val iv = ByteArray(16)
         qrBytes.get(iv)
         val encryptedBodyLen = qrBytes.getInt()
         val encryptedBody = ByteArray(encryptedBodyLen)
         qrBytes.get(encryptedBody)
-
         val key : ByteArray
         if (firstComponent != null) {
             key = EncryptionUtils.produce256BitsFromComponents(firstComponent, secondComponent)
         } else {
-            TODO("Read associated first component")
+            TODO("Read global first component")
         }
-
         val userBytes = ByteBuffer.wrap(EncryptionUtils.decryptDataWithAes256(encryptedBody, key, iv))
         userBytes.order(ByteOrder.LITTLE_ENDIAN)
         val hostIpBytes = ByteArray(4)
