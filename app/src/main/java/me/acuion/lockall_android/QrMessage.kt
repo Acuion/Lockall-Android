@@ -1,11 +1,14 @@
 package me.acuion.lockall_android
 
 import android.util.Base64
-import android.widget.Toast
+import com.beust.klaxon.Klaxon
 import me.acuion.lockall_android.crypto.EncryptionUtils
+import me.acuion.lockall_android.messages.pairing.MessageWithName
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.charset.Charset
+import java.util.*
 
 // QR:
 // 00/01 - safe or unsafe (without the first component or with)
@@ -19,14 +22,14 @@ import java.nio.ByteOrder
 // Unencrypted body:
 // host's ip 4 bytes
 // host's port 4 bytes
-// user data...
+// JSON user data...
 
 class QrMessage(base64Data: String) {
     val firstComponent : ByteArray?
     val secondComponent : ByteArray
     val hostAddress : InetAddress
     val hostPort : Int
-    val userData : ByteArray
+    val userDataJson : String
 
     init {
         val qrBytes = ByteBuffer.wrap(Base64.decode(base64Data, 0))
@@ -58,7 +61,8 @@ class QrMessage(base64Data: String) {
         userBytes.get(hostIpBytes)
         hostAddress = InetAddress.getByAddress(hostIpBytes)
         hostPort = userBytes.getInt()
-        userData = ByteArray(userBytes.remaining())
-        userBytes.get(userData)
+        val userDataRaw = ByteArray(userBytes.remaining())
+        userBytes.get(userDataRaw)
+        userDataJson = String(userDataRaw, Charset.forName("UTF-8"))
     }
 }

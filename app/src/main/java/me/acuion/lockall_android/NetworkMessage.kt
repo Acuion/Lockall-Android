@@ -7,15 +7,15 @@ import java.net.InetAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.charset.Charset
 
-class NetworkMessage(secondComponent : ByteArray, userData : ByteArray) {
+class NetworkMessage(key : ByteArray, userDataJson : String) {
     val readyMessage : ByteArray
 
     init {
-        val key = EncryptionUtils.produce256BitsFromComponents(null, // TODO
-                secondComponent)
         val iv = EncryptionUtils.generate128bitIv()
-        val encryptedUserData = EncryptionUtils.encryptDataWithAes256(userData, key, iv)
+        val encryptedUserData = EncryptionUtils.encryptDataWithAes256(
+                userDataJson.toByteArray(Charset.forName("UTF-8")), key, iv)
 
         val message  = ByteBuffer.allocate(4 + iv.size + encryptedUserData.size)
         message.order(ByteOrder.LITTLE_ENDIAN)
