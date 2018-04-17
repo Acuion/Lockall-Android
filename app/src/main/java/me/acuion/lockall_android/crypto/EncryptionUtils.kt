@@ -26,13 +26,13 @@ class EncryptionUtils {
         }
 
         fun encryptDataWithAes256(data: ByteArray, key: ByteArray, iv : ByteArray): ByteArray {
-            val ecipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            val ecipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
             ecipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
             return ecipher.doFinal(data)
         }
 
         fun decryptDataWithAes256(data: ByteArray, key: ByteArray, iv : ByteArray): ByteArray {
-            val ecipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            val ecipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
             ecipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), IvParameterSpec(iv))
             return ecipher.doFinal(data)
         }

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Bundle
 import com.google.gson.Gson
 import kotlinx.android.synthetic.main.activity_main.*
+import me.acuion.lockall_android.crypto.EncryptedJsonStorageManager
 import me.acuion.lockall_android.crypto.EncryptionUtils
 import me.acuion.lockall_android.messages.pairing.MessageWithName
 
@@ -20,8 +21,18 @@ class MainActivity : Activity() {
 
                     val qrData = QrMessage(base64FromQr)
                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithName::class.java)!!
-                    //TODO("Set the first component globally")
-                    val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+
+                    val fcm = EncryptedJsonStorageManager(applicationContext,
+                            "firstComponentsStorage")
+                    val storage = gson.fromJson(fcm.data, FirstComponentsStorage::class.java)
+                    storage.put(qrContent.name, qrData.firstComponent!!)
+                    fcm.data = gson.toJsonTree(storage).asJsonObject
+
+                    val newstorage = gson.fromJson(fcm.data, FirstComponentsStorage::class.java)
+
+                    val gotFc = newstorage.firstComponents[0]!!
+
+                    val key = EncryptionUtils.produce256BitsFromComponents(gotFc,
                             qrData.secondComponent)
                     val message = NetworkMessage(key,
                             gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
