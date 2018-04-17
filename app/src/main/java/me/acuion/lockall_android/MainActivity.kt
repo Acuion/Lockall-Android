@@ -3,11 +3,10 @@ package me.acuion.lockall_android
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import com.beust.klaxon.Klaxon
+import com.google.gson.Gson
 import kotlinx.android.synthetic.main.activity_main.*
 import me.acuion.lockall_android.crypto.EncryptionUtils
 import me.acuion.lockall_android.messages.pairing.MessageWithName
-import java.util.*
 
 class MainActivity : Activity() {
 
@@ -15,15 +14,17 @@ class MainActivity : Activity() {
         when(requestCode) {
             42 -> { // pairing
                 runOnUiThread {
+                    val gson = Gson()
+
                     val base64FromQr = data!!.extras.getString("data")
 
                     val qrData = QrMessage(base64FromQr)
-                    val qrContent = Klaxon().parse<MessageWithName>(qrData.userDataJson)!!
+                    val qrContent = gson.fromJson(qrData.userDataJson, MessageWithName::class.java)!!
                     //TODO("Set the first component globally")
                     val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
                             qrData.secondComponent)
                     val message = NetworkMessage(key,
-                            Klaxon().toJsonString(MessageWithName(qrContent.name)))
+                            gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
                     message.send(qrData.hostAddress, qrData.hostPort)
                 }
             }

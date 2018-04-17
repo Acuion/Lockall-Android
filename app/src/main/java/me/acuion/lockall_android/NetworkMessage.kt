@@ -1,5 +1,7 @@
 package me.acuion.lockall_android
 
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
 import kotlinx.coroutines.experimental.Job
 import kotlinx.coroutines.experimental.launch
 import me.acuion.lockall_android.crypto.EncryptionUtils
@@ -9,13 +11,13 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
 
-class NetworkMessage(key : ByteArray, userDataJson : String) {
+class NetworkMessage(key : ByteArray, userDataJson : JsonObject) {
     val readyMessage : ByteArray
 
     init {
         val iv = EncryptionUtils.generate128bitIv()
         val encryptedUserData = EncryptionUtils.encryptDataWithAes256(
-                userDataJson.toByteArray(Charset.forName("UTF-8")), key, iv)
+                userDataJson.toString().toByteArray(Charset.forName("UTF-8")), key, iv)
 
         val message  = ByteBuffer.allocate(4 + iv.size + encryptedUserData.size)
         message.order(ByteOrder.LITTLE_ENDIAN)
