@@ -16,10 +16,17 @@ import javax.crypto.Cipher
 import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
 
-class EncryptedJsonStorageManager(val context : Context, val filename : String) {
+class EncryptedJsonStorageManager(val context : Context, val filename : Filename) {
+    companion object {
+        enum class Filename(val filename : String) {
+            FirstComponentsStorage("firstComponentsStorage")
+        }
+    }
+
     var data : JsonObject
+
     get() {
-        val file = File(context.filesDir, filename)
+        val file = File(context.filesDir, filename.filename)
 
         if (!file.exists())
             return JsonObject()
@@ -35,7 +42,7 @@ class EncryptedJsonStorageManager(val context : Context, val filename : String) 
         keyStore.load(null)
 
         val secretKeyEntry = keyStore
-                .getEntry(filename, null) as KeyStore.SecretKeyEntry
+                .getEntry(filename.filename, null) as KeyStore.SecretKeyEntry
         val secretKey = secretKeyEntry.secretKey
 
         val cipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
@@ -46,7 +53,7 @@ class EncryptedJsonStorageManager(val context : Context, val filename : String) 
     set(value) {
         val keyGenerator : KeyGenerator = KeyGenerator
                 .getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
-        val keyGenParameterSpec = KeyGenParameterSpec.Builder(filename,
+        val keyGenParameterSpec = KeyGenParameterSpec.Builder(filename.filename,
                 KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                 .setKeySize(256)
                 .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
@@ -62,7 +69,7 @@ class EncryptedJsonStorageManager(val context : Context, val filename : String) 
         val encryptedData = cipher.doFinal(value.toString()
                 .toByteArray(Charset.forName("UTF-8")))
 
-        val file = File(context.filesDir, filename)
+        val file = File(context.filesDir, filename.filename)
         file.writeBytes(iv)
         file.appendBytes(encryptedData)
     }

@@ -22,8 +22,7 @@ class MainActivity : Activity() {
                     val qrData = QrMessage(base64FromQr)
                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithName::class.java)!!
 
-                    val fcm = EncryptedJsonStorageManager(applicationContext,
-                            "firstComponentsStorage")
+                    val fcm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.FirstComponentsStorage)
                     val storage = gson.fromJson(fcm.data, FirstComponentsStorage::class.java)
                     storage.put(qrContent.name, qrData.firstComponent!!)
                     fcm.data = gson.toJsonTree(storage).asJsonObject
