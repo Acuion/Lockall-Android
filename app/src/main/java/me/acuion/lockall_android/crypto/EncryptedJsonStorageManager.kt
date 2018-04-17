@@ -6,6 +6,7 @@ import javax.crypto.KeyGenerator
 import android.security.keystore.KeyGenParameterSpec
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import me.acuion.lockall_android.FirstComponentsStorage
 import java.io.File
 import java.nio.ByteBuffer
@@ -39,9 +40,8 @@ class EncryptedJsonStorageManager(val context : Context, val filename : String) 
 
         val cipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
         cipher.init(Cipher.DECRYPT_MODE, secretKey, IvParameterSpec(iv))
-        return Gson().toJsonTree(String(cipher.doFinal(encryptedData),
-                Charset.forName("UTF-8")),
-                FirstComponentsStorage::class.java).asJsonObject
+        val jsonString = String(cipher.doFinal(encryptedData), Charset.forName("UTF-8"))
+        return JsonParser().parse(jsonString).asJsonObject
     }
     set(value) {
         val keyGenerator : KeyGenerator = KeyGenerator
