@@ -18,9 +18,6 @@ import android.support.v4.os.CancellationSignal
 
 
 class MainActivity : Activity() {
-
-    lateinit var fpManager : FingerprintManagerCompat
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         when(requestCode) {
             42 -> { // pairing
@@ -56,13 +53,13 @@ class MainActivity : Activity() {
         READY
     }
 
-    fun checkSensorState(context: Context): SensorState {
-        if (fpManager.isHardwareDetected) {
+    private fun checkSensorState(context: Context): SensorState {
+        val fingerprintManager = FingerprintManagerCompat.from(context)
+        if (fingerprintManager.isHardwareDetected) {
             val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
             if (!keyguardManager.isKeyguardSecure) {
                 return SensorState.NOT_BLOCKED
             }
-            val fingerprintManager = FingerprintManagerCompat.from(context)
             return if (!fingerprintManager.hasEnrolledFingerprints()) {
                 SensorState.NO_FINGERPRINTS
             } else SensorState.READY
@@ -74,8 +71,6 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        fpManager = FingerprintManagerCompat.from(applicationContext)
 
         if (checkSensorState(applicationContext) != SensorState.READY) {
             Toast.makeText(applicationContext, "Fingerprint problems", Toast.LENGTH_LONG).show()
