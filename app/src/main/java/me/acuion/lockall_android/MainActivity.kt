@@ -37,17 +37,11 @@ class MainActivity : Activity() {
                         val storage = gson.fromJson(it, FirstComponentsStorage::class.java)
                         storage.put(qrContent.name, qrData.firstComponent!!)
                         fcm.setData(gson.toJsonTree(storage).asJsonObject, CancellationSignal()) {
-                            fcm.loadData(CancellationSignal()) {
-                                val newstorage = gson.fromJson(it, FirstComponentsStorage::class.java)
-
-                                val gotFc = newstorage.firstComponents[0]
-
-                                val key = EncryptionUtils.produce256BitsFromComponents(gotFc,
+                                val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent,
                                         qrData.secondComponent)
                                 val message = NetworkMessage(key,
                                         gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
                                 message.send(qrData.hostAddress, qrData.hostPort)
-                            }
                         }
                     }
                 }
