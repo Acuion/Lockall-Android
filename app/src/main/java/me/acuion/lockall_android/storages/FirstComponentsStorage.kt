@@ -1,10 +1,9 @@
-package me.acuion.lockall_android
+package me.acuion.lockall_android.storages
 
 class FirstComponentsStorage {
     private val map = HashMap<String, ByteArray>()
 
-    fun put(name : String, firstComponent : ByteArray)
-    {
+    fun put(name : String, firstComponent : ByteArray) {
         map[name] = firstComponent
     }
 

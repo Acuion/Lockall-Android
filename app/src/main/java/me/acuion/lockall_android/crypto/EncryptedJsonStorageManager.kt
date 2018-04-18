@@ -24,7 +24,8 @@ import com.google.gson.JsonSyntaxException
 class EncryptedJsonStorageManager(val context : Context, val encfile : Filename) {
     companion object {
         enum class Filename(val fname : String) {
-            FirstComponentsStorage("firstComponentsStorage")
+            FirstComponentsStorage("firstComponentsStorage"),
+            PasswordsStorage("passwordsStorage")
         }
     }
 

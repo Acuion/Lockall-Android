@@ -4,6 +4,7 @@ import android.util.Base64
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import me.acuion.lockall_android.crypto.EncryptionUtils
+import me.acuion.lockall_android.storages.FirstComponentsStorage
 import java.net.InetAddress
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -23,22 +24,38 @@ import java.nio.charset.Charset
 // host's port 4 bytes
 // JSON user data...
 
-class QrMessage(base64Data: String) {
-    val firstComponent : ByteArray?
+class QrMessage(base64Data: String, fcstorage : FirstComponentsStorage) {
+    var firstComponent : ByteArray? = null
     val secondComponent : ByteArray
-    val hostAddress : InetAddress
-    val hostPort : Int
-    val userDataJson : JsonObject
+    var hostAddress : InetAddress? = null
+    var hostPort : Int = 0
+    var userDataJson : JsonObject = JsonObject()
+
+    private fun tryToDecrypt(encryptedBody : ByteArray, key : ByteArray, iv : ByteArray) : Boolean {
+        return try {
+            val userBytes = ByteBuffer.wrap(EncryptionUtils.decryptDataWithAes256(encryptedBody, key, iv))
+            userBytes.order(ByteOrder.LITTLE_ENDIAN)
+            val hostIpBytes = ByteArray(4)
+            userBytes.get(hostIpBytes)
+            hostAddress = InetAddress.getByAddress(hostIpBytes)
+            hostPort = userBytes.getInt()
+            val userDataRaw = ByteArray(userBytes.remaining())
+            userBytes.get(userDataRaw)
+
+            userDataJson = JsonParser().parse(String(userDataRaw, Charset.forName("UTF-8"))).asJsonObject
+            true
+        } catch (ex : Exception) {
+            false
+        }
+    }
 
     init {
         val qrBytes = ByteBuffer.wrap(Base64.decode(base64Data, 0))
         qrBytes.order(ByteOrder.LITTLE_ENDIAN)
         if (qrBytes.get().compareTo(1) == 0) {
-            var fcLen = qrBytes.getInt()
+            val fcLen = qrBytes.getInt()
             firstComponent = ByteArray(fcLen)
             qrBytes.get(firstComponent)
-        } else {
-            firstComponent = null
         }
         val scLen = qrBytes.getInt()
         secondComponent = ByteArray(scLen)
@@ -48,21 +65,15 @@ class QrMessage(base64Data: String) {
         val encryptedBodyLen = qrBytes.getInt()
         val encryptedBody = ByteArray(encryptedBodyLen)
         qrBytes.get(encryptedBody)
-        val key : ByteArray
         if (firstComponent != null) {
-            key = EncryptionUtils.produce256BitsFromComponents(firstComponent, secondComponent)
+            tryToDecrypt(encryptedBody,
+                    EncryptionUtils.produce256BitsFromComponents(firstComponent!!, secondComponent), iv)
         } else {
-            TODO("Read global first component")
+            fcstorage.firstComponents.forEach {
+                if (tryToDecrypt(encryptedBody, EncryptionUtils.produce256BitsFromComponents(it, secondComponent), iv)) {
+                    return@forEach
+                }
+            }
         }
-        val userBytes = ByteBuffer.wrap(EncryptionUtils.decryptDataWithAes256(encryptedBody, key, iv))
-        userBytes.order(ByteOrder.LITTLE_ENDIAN)
-        val hostIpBytes = ByteArray(4)
-        userBytes.get(hostIpBytes)
-        hostAddress = InetAddress.getByAddress(hostIpBytes)
-        hostPort = userBytes.getInt()
-        val userDataRaw = ByteArray(userBytes.remaining())
-        userBytes.get(userDataRaw)
-
-        userDataJson = JsonParser().parse(String(userDataRaw, Charset.forName("UTF-8"))).asJsonObject
     }
 }
