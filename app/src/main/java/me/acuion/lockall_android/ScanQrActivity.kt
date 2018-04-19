@@ -4,17 +4,15 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.util.Log
 import android.view.SurfaceHolder
 import com.google.android.gms.vision.CameraSource
 import com.google.android.gms.vision.Detector
 import com.google.android.gms.vision.barcode.Barcode
 import com.google.android.gms.vision.barcode.BarcodeDetector
-import kotlinx.android.synthetic.main.activity_pairing.*
+import kotlinx.android.synthetic.main.activity_scanqr.*
 import java.io.IOException
 
 class ScanQrActivity : Activity() {
-
     lateinit var qrDetecor : BarcodeDetector
     lateinit var cameraSource: CameraSource
 
@@ -37,7 +35,7 @@ class ScanQrActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_pairing)
+        setContentView(R.layout.activity_scanqr)
 
         val expectedPrefix = intent.getStringExtra("prefix")
 
@@ -68,20 +66,23 @@ class ScanQrActivity : Activity() {
 
         qrDetecor.setProcessor(object: Detector.Processor<Barcode>{
             override fun receiveDetections(p0: Detector.Detections<Barcode>?) {
-                if (p0!!.detectedItems.size() == 0)
+                if (p0!!.detectedItems.size() == 0) {
+                    txtresult.post {
+                        txtresult.text = getString(R.string.scan_qr)
+                    }
                     return
+                }
                 if (!p0.detectedItems.valueAt(0).displayValue.startsWith("LOCKALL:")) {
                     txtresult.post {
-                        txtresult.text = "It is not a Lockall qr!"
+                        txtresult.text = getString(R.string.not_lockall_qr)
                     }
                     return
                 }
                 val resultIntent = Intent()
                 val data = p0.detectedItems.valueAt(0).displayValue.substring(8)
                 if (data.indexOf(":") == -1)
-                    return // todo
-                if (data.split(':')[0] != expectedPrefix)
                     return
+                resultIntent.putExtra("prefix", data.split(':')[0])
                 resultIntent.putExtra("data", data.split(':')[1])
                 setResult(RESULT_OK, resultIntent)
                 finish()

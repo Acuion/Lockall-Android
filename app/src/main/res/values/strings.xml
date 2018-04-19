@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Lockall-Android</string>
+    <string name="scan_qr">Just scan a QR (☞ﾟヮﾟ)☞</string>
+    <string name="not_lockall_qr">Hey, it is not a Lockall QR (☉_☉)</string>
 </resources>
