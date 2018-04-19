@@ -53,7 +53,7 @@ class MainActivity : Activity() {
                     val fcstorage = gson.fromJson(fcjo, FirstComponentsStorage::class.java)
 
                     val qrData = QrMessage(data!!.getStringExtra("data")!!, fcstorage)
-                    val qrPrefix = data!!.getStringExtra("prefix")!!
+                    val qrPrefix = data.getStringExtra("prefix")!!
                     if (qrData.firstComponent == null) {
                         Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
                         return@authUser
@@ -67,7 +67,8 @@ class MainActivity : Activity() {
                             try {
                                 firstComponentsEjsm.data = gson.toJsonTree(fcstorage).asJsonObject
                             } catch (ex: Exception) {
-                                TODO("Failed")
+                                Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
+                                return@authUser
                             }
                             val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
                                     qrData.secondComponent)
@@ -81,7 +82,8 @@ class MainActivity : Activity() {
                             val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
                             val pjo = ejsm.data
                             if (pjo == null) {
-                                TODO("Failed")
+                                Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
+                                return@authUser
                             }
                             val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
                             storage.put(qrContent.resourceid, qrContent.password)
@@ -89,7 +91,8 @@ class MainActivity : Activity() {
                                 ejsm.data = gson.toJsonTree(storage).asJsonObject
                             } catch (ex: Exception) {
                                 ex.printStackTrace()
-                                TODO("Failed")
+                                Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
+                                return@authUser
                             }
                             val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
                                     qrData.secondComponent)
@@ -103,7 +106,8 @@ class MainActivity : Activity() {
                             val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
                             val pjo = ejsm.data
                             if (pjo == null) {
-                                TODO("Failed")
+                                Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
+                                return@authUser
                             }
                             val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
                             val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
