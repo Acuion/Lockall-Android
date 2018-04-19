@@ -44,24 +44,31 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
         buffer.get(encryptedData)
 
         val ahelper = CryptoHelper(IvParameterSpec(iv))
-        val cipher = ahelper.getCipher()
+        val cipher = ahelper.getCipher(false)
         if (cipher == null) {
-            TODO("Failed")
+            if (ahelper.invalidatedKey) {
+                Toast.makeText(context, "The key was invalidated, the storage is lost!", Toast.LENGTH_SHORT).show()
+                return JsonObject()  // invalidated :(
+            } else
+                Toast.makeText(context, "Failed to initialize a cryptographic backend :(", Toast.LENGTH_SHORT).show()
+            return null
         }
         return try {
             val jsonString = String(cipher.doFinal(encryptedData), Charset.forName("UTF-8"))
             JsonParser().parse(jsonString).asJsonObject
         }
         catch (ex : Exception) {
+            Toast.makeText(context, "Failed to decrypt, the storage is lost!", Toast.LENGTH_SHORT).show()
             ex.printStackTrace()
             JsonObject() // invalidated :(
         }
     }
     set(value) {
         val ahelper = CryptoHelper()
-        val cipher = ahelper.getCipher()
+        val cipher = ahelper.getCipher(true)
         if (cipher == null) {
-            TODO("Failed")
+            Toast.makeText(context, "Failed to initialize a cryptographic backend :(", Toast.LENGTH_SHORT).show()
+            throw RuntimeException()
         }
 
         val encryptedData = cipher.doFinal(value.toString()
@@ -83,12 +90,18 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
         var iv : IvParameterSpec? = null
         val mode : CryptoMode
         val alias : String = "LOCKALL_KEY_SECS"
+        var invalidatedKey : Boolean = false
 
-        fun getCipher() : Cipher? {
-            return if (prepareKeyStore() && prepareCipher() && prepareKey() && initCipher())
-                cipher
-            else
-                null
+        fun getCipher(recreateKeyIfNeeded : Boolean) : Cipher? {
+            if (prepareKeyStore() && prepareCipher() && prepareKey())
+                return null
+            if (initCipher())
+                return cipher
+            if (recreateKeyIfNeeded) {
+                if (prepareKey() && initCipher())
+                    return cipher
+            }
+            return null
         }
 
         constructor(iv : IvParameterSpec) {
@@ -112,6 +125,7 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
 
                 return true
             } catch (ex : KeyPermanentlyInvalidatedException) {
+                invalidatedKey = true
                 try {
                     keyStore!!.deleteEntry(alias)
                 } catch (ex: Exception) {

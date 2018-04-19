@@ -32,7 +32,7 @@ class MainActivity : Activity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (resultCode == RESULT_CANCELED) {
-            return // TODO?
+            return
         }
 
         when (requestCode) {
@@ -47,14 +47,16 @@ class MainActivity : Activity() {
                             EncryptedJsonStorageManager.Companion.Filename.FirstComponentsStorage)
                     val fcjo = firstComponentsEjsm.data
                     if (fcjo == null) {
-                        TODO("Failed")
+                        Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
+                        return@authUser
                     }
                     val fcstorage = gson.fromJson(fcjo, FirstComponentsStorage::class.java)
 
                     val qrData = QrMessage(data!!.getStringExtra("data")!!, fcstorage)
                     val qrPrefix = data!!.getStringExtra("prefix")!!
                     if (qrData.firstComponent == null) {
-                        TODO("Failed")
+                        Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
+                        return@authUser
                     }
 
                     when (qrPrefix) {

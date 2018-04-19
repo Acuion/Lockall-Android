@@ -2,6 +2,5 @@
     <string name="app_name">Lockall-Android</string>
     <string name="scan_qr">Just scan a QR (☞ﾟヮﾟ)☞</string>
     <string name="not_lockall_qr">Hey, it is not a Lockall QR (☉_☉)</string>
-    <string name="pair_qr">Do you really want to pair with this device? Do it in a place where nobody can steal your QR or all your passwords are in serious danger! (⌐■_■)</string>
-    <string name="i_m_safe_pair_me"><![CDATA[>> I\'m safe, pair me <<]]></string>
+    <string name="pair_qr">Do you really want to pair with this device? Do it in a place where nobody can steal your QR or all your passwords are in serious danger! (⌐■_■)\nTap the camera to confirm.</string>
 </resources>

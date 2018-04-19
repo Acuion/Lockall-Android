@@ -40,6 +40,7 @@ class ScanQrActivity : Activity() {
         setContentView(R.layout.activity_scanqr)
 
         val resultIntent = Intent()
+        var needConfirmation = false
 
         qrDetecor = BarcodeDetector.Builder(this).setBarcodeFormats(Barcode.QR_CODE).build()
         cameraSource = CameraSource.Builder(this, qrDetecor).setRequestedPreviewSize(640, 480).setAutoFocusEnabled(true).build()
@@ -71,14 +72,14 @@ class ScanQrActivity : Activity() {
                 if (p0!!.detectedItems.size() == 0) {
                     txtresult.post {
                         txtresult.text = getString(R.string.scan_qr)
-                        buttonSafe.visibility = GONE
+                        needConfirmation = false
                     }
                     return
                 }
                 if (!p0.detectedItems.valueAt(0).displayValue.startsWith("LOCKALL:")) {
                     txtresult.post {
                         txtresult.text = getString(R.string.not_lockall_qr)
-                        buttonSafe.visibility = GONE
+                        needConfirmation = false
                     }
                     return
                 }
@@ -91,7 +92,7 @@ class ScanQrActivity : Activity() {
                 if (prefix == QrType.PAIRING.prefix) {
                     txtresult.post {
                         txtresult.text = getString(R.string.pair_qr)
-                        buttonSafe.visibility = VISIBLE
+                        needConfirmation = true
                     }
                 } else {
                     setResult(RESULT_OK, resultIntent)
@@ -104,7 +105,9 @@ class ScanQrActivity : Activity() {
 
         })
 
-        buttonSafe.setOnClickListener {
+        cameraPreview.setOnClickListener {
+            if (!needConfirmation)
+                return@setOnClickListener
             setResult(RESULT_OK, resultIntent)
             finish()
         }
