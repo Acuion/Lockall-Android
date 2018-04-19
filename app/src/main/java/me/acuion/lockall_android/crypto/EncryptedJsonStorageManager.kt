@@ -94,12 +94,13 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
 
         fun getCipher(recreateKeyIfNeeded : Boolean) : Cipher? {
             if (prepareKeyStore() && prepareCipher() && prepareKey())
-                return null
-            if (initCipher())
-                return cipher
-            if (recreateKeyIfNeeded) {
-                if (prepareKey() && initCipher())
+            {
+                if (initCipher())
                     return cipher
+                if (recreateKeyIfNeeded) {
+                    if (prepareKey() && initCipher())
+                        return cipher
+                }
             }
             return null
         }

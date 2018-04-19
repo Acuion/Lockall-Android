@@ -112,8 +112,13 @@ class MainActivity : Activity() {
                             val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
                             val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
                                     qrData.secondComponent)
+                            val pass = storage.getPass(qrContent.resourceid)
+                            if (pass == null) {
+                                Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
+                                return@authUser
+                            }
                             val message = NetworkMessage(key,
-                                    gson.toJsonTree(MessageWithPassword(qrContent.resourceid, storage.getPass(qrContent.resourceid)!!)).asJsonObject)
+                                    gson.toJsonTree(MessageWithPassword(qrContent.resourceid, pass)).asJsonObject)
                             message.send(qrData.hostAddress!!, qrData.hostPort)
                         }
                         else -> {
