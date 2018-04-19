@@ -21,18 +21,29 @@ import me.acuion.lockall_android.storages.PasswordsStorage
 
 
 class MainActivity : Activity() {
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        val gson = Gson()
-        val base64FromQr = data!!.extras.getString("data")
+    lateinit var keyguardManager : KeyguardManager
 
-        val firstComponentsEjsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.FirstComponentsStorage)
-        firstComponentsEjsm.loadData(CancellationSignal()) {
-            if (it == null) {
+    lateinit var systemwideAuthSuccessCallback : () -> Unit
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == 100) {
+            if (resultCode == RESULT_OK) {
+                systemwideAuthSuccessCallback()
+            }
+            return
+        }
+
+        val gson = Gson()
+        authUser {
+            val firstComponentsEjsm = EncryptedJsonStorageManager(applicationContext,
+                    EncryptedJsonStorageManager.Companion.Filename.FirstComponentsStorage)
+            val fcjo = firstComponentsEjsm.data
+            if (fcjo == null) {
                 TODO("Failed")
             }
-            val fcstorage = gson.fromJson(it, FirstComponentsStorage::class.java)
+            val fcstorage = gson.fromJson(fcjo, FirstComponentsStorage::class.java)
 
-            val qrData = QrMessage(base64FromQr, fcstorage)
+            val qrData = QrMessage(data!!.getStringExtra("data")!!, fcstorage)
             if (qrData.firstComponent == null) {
                 TODO("Failed")
             }
@@ -42,105 +53,97 @@ class MainActivity : Activity() {
                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithName::class.java)!!
 
                     fcstorage.put(qrContent.name, qrData.firstComponent!!)
-                    firstComponentsEjsm.setData(gson.toJsonTree(fcstorage).asJsonObject, CancellationSignal()) {
-                        if (!it) {
-                            TODO("Failed")
-                        }
-                        val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                qrData.secondComponent)
-                        val message = NetworkMessage(key,
-                                gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
-                        message.send(qrData.hostAddress!!, qrData.hostPort)
+                    try {
+                        firstComponentsEjsm.data = gson.toJsonTree(fcstorage).asJsonObject
+                    } catch (ex: Exception) {
+                        TODO("Failed")
                     }
+                    val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                            qrData.secondComponent)
+                    val message = NetworkMessage(key,
+                            gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
+                    message.send(qrData.hostAddress!!, qrData.hostPort)
                 }
                 43 -> { // store
                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithPassword::class.java)!!
 
                     val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
-                    ejsm.loadData(CancellationSignal()) {
-                        if (it == null) {
-                            TODO("Failed")
-                        }
-                        val storage = gson.fromJson(it, PasswordsStorage::class.java)
-                        storage.put(qrContent.resourceid, qrContent.password)
-                        ejsm.setData(gson.toJsonTree(storage).asJsonObject, CancellationSignal()) {
-                            if (!it) {
-                                TODO("Failed")
-                            }
-
-                            val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                    qrData.secondComponent)
-                            val message = NetworkMessage(key,
-                                    gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
-                            message.send(qrData.hostAddress!!, qrData.hostPort)
-                        }
+                    val pjo = ejsm.data
+                    if (pjo == null) {
+                        TODO("Failed")
                     }
+                    val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
+                    storage.put(qrContent.resourceid, qrContent.password)
+                    try {
+                        ejsm.data = gson.toJsonTree(storage).asJsonObject
+                    } catch (ex: Exception) {
+                        ex.printStackTrace()
+                        TODO("Failed")
+                    }
+                    val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                            qrData.secondComponent)
+                    val message = NetworkMessage(key,
+                            gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
+                    message.send(qrData.hostAddress!!, qrData.hostPort)
                 }
                 44 -> { // load
                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithResourceid::class.java)!!
 
                     val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
-                    ejsm.loadData(CancellationSignal()) {
-                        if (it == null) {
-                            TODO("Failed")
-                        }
-                        val storage = gson.fromJson(it, PasswordsStorage::class.java)
-                        val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                qrData.secondComponent)
-                        val message = NetworkMessage(key,
-                                gson.toJsonTree(MessageWithPassword(qrContent.resourceid, storage.getPass(qrContent.resourceid)!!)).asJsonObject)
-                        message.send(qrData.hostAddress!!, qrData.hostPort)
+                    val pjo = ejsm.data
+                    if (pjo == null) {
+                        TODO("Failed")
                     }
+                    val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
+                    val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                            qrData.secondComponent)
+                    val message = NetworkMessage(key,
+                            gson.toJsonTree(MessageWithPassword(qrContent.resourceid, storage.getPass(qrContent.resourceid)!!)).asJsonObject)
+                    message.send(qrData.hostAddress!!, qrData.hostPort)
                 }
             }
         }
     }
 
-    enum class SensorState {
-        NOT_SUPPORTED,
-        NOT_BLOCKED,
-        NO_FINGERPRINTS,
-        READY
+    fun authUser(successCallback : () -> Unit) {
+        systemwideAuthSuccessCallback = successCallback
+        val authintent = keyguardManager.createConfirmDeviceCredentialIntent("Access to the lockall keystorage", "")
+        if (authintent != null) {
+            startActivityForResult(authintent, 100)
+        } else {
+            systemwideAuthSuccessCallback()
+        }
     }
 
-    private fun checkSensorState(context: Context): SensorState {
-        val fingerprintManager = FingerprintManagerCompat.from(context)
-        if (fingerprintManager.isHardwareDetected) {
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            if (!keyguardManager.isKeyguardSecure) {
-                return SensorState.NOT_BLOCKED
-            }
-            return if (!fingerprintManager.hasEnrolledFingerprints()) {
-                SensorState.NO_FINGERPRINTS
-            } else SensorState.READY
-        } else {
-            return SensorState.NOT_SUPPORTED
+    fun launchQrActivity(requestCode: Int) {
+        val qrIntent = Intent(applicationContext, ScanQrActivity::class.java)
+        when (requestCode) {
+            42 -> qrIntent.putExtra("prefix", "PAIRING")
+            43 -> qrIntent.putExtra("prefix", "STORE")
+            44 -> qrIntent.putExtra("prefix", "LOAD")
         }
+        startActivityForResult(qrIntent, requestCode)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        if (checkSensorState(applicationContext) != SensorState.READY) {
-            Toast.makeText(applicationContext, "Fingerprint problems", Toast.LENGTH_LONG).show()
+        keyguardManager = applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+
+        if (!keyguardManager.isDeviceSecure) {
+            Toast.makeText(applicationContext, "Should be locked", Toast.LENGTH_LONG).show()
             return
         }
 
         buttonPair.setOnClickListener {
-            val qrIntent = Intent(applicationContext, ScanQrActivity::class.java)
-            qrIntent.putExtra("prefix", "PAIRING")
-            startActivityForResult(qrIntent, 42)
+            launchQrActivity(42)
         }
         buttonStore.setOnClickListener {
-            val qrIntent = Intent(applicationContext, ScanQrActivity::class.java)
-            qrIntent.putExtra("prefix", "STORE")
-            startActivityForResult(qrIntent, 43)
+            launchQrActivity(43)
         }
         buttonLoad.setOnClickListener {
-            val qrIntent = Intent(applicationContext, ScanQrActivity::class.java)
-            qrIntent.putExtra("prefix", "LOAD")
-            startActivityForResult(qrIntent, 44)
+            launchQrActivity(44)
         }
     }
 }

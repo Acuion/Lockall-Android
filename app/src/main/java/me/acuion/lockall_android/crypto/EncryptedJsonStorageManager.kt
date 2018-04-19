@@ -1,6 +1,8 @@
 package me.acuion.lockall_android.crypto
 
+import android.app.KeyguardManager
 import android.content.Context
+import android.content.Context.KEYGUARD_SERVICE
 import android.security.keystore.KeyProperties
 import javax.crypto.KeyGenerator
 import android.security.keystore.KeyGenParameterSpec
@@ -13,12 +15,9 @@ import java.nio.ByteBuffer
 import java.nio.charset.Charset
 import java.security.KeyStore
 import javax.crypto.Cipher
-import javax.crypto.SecretKey
 import javax.crypto.spec.IvParameterSpec
 import android.widget.Toast
-import android.R.string.cancel
 import android.support.v4.os.CancellationSignal
-import com.google.gson.JsonSyntaxException
 
 
 class EncryptedJsonStorageManager(val context : Context, val encfile : Filename) {
@@ -29,16 +28,12 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
         }
     }
 
-    private fun getAuthorizedChipher() {
-
-    }
-
-    fun loadData(cancellationSignal: CancellationSignal, callback : (data : JsonObject?) -> Unit) {
+    var data : JsonObject?
+    get() {
         val file = File(context.filesDir, encfile.fname)
 
         if (!file.exists()) {
-            callback(JsonObject())
-            return
+            return JsonObject()
         }
 
         val buffer = ByteBuffer.wrap(file.readBytes())
@@ -48,79 +43,61 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
         val encryptedData = ByteArray(buffer.remaining())
         buffer.get(encryptedData)
 
-        val ahelper = CryptoHelperForAlias(encfile.fname, IvParameterSpec(iv))
-        val fpco = ahelper.fingerprintCryptoObject
-        if (fpco == null) {
-            callback(null)
-            return
+        val ahelper = CryptoHelper(IvParameterSpec(iv))
+        val cipher = ahelper.getCipher()
+        if (cipher == null) {
+            TODO("Failed")
         }
-
-        val fphelper = FingerprintHelper(context, cancellationSignal)
-        fphelper.startAuth(fpco) {
-            try {
-                val jsonString = String(it.doFinal(encryptedData), Charset.forName("UTF-8"))
-                callback(JsonParser().parse(jsonString).asJsonObject)
-            }
-            catch (ex : Exception) {
-                ex.printStackTrace()
-                callback(JsonObject()) // invalidated :(
-            }
+        return try {
+            val jsonString = String(cipher.doFinal(encryptedData), Charset.forName("UTF-8"))
+            JsonParser().parse(jsonString).asJsonObject
+        }
+        catch (ex : Exception) {
+            ex.printStackTrace()
+            JsonObject() // invalidated :(
         }
     }
-
-    fun setData(value : JsonObject, cancellationSignal: CancellationSignal, callback : (success : Boolean) -> Unit) {
-        val ahelper = CryptoHelperForAlias(encfile.fname)
-        val fpco = ahelper.fingerprintCryptoObject
-        if (fpco == null) {
-            callback(false)
-            return
+    set(value) {
+        val ahelper = CryptoHelper()
+        val cipher = ahelper.getCipher()
+        if (cipher == null) {
+            TODO("Failed")
         }
 
-        val fphelper = FingerprintHelper(context, cancellationSignal)
-        fphelper.startAuth(fpco) {
-            try {
-                val encryptedData = it.doFinal(value.toString()
-                        .toByteArray(Charset.forName("UTF-8")))
-                val file = File(context.filesDir, encfile.fname)
-                file.writeBytes(it.iv)
-                file.appendBytes(encryptedData)
-                callback(true)
-            } catch (ex :Exception) {
-                ex.printStackTrace()
-                callback(false)
-            }
-        }
+        val encryptedData = cipher.doFinal(value.toString()
+                .toByteArray(Charset.forName("UTF-8")))
+        val file = File(context.filesDir, encfile.fname)
+        file.writeBytes(cipher.iv)
+        file.appendBytes(encryptedData)
     }
 
     private enum class CryptoMode {
         ENCRYPT, DECRYPT
     }
 
-    private class CryptoHelperForAlias {
+    private class CryptoHelper {
         private var keyStore : KeyStore? = null
-        private var cipher : Cipher? = null
         private var keyGenerator : KeyGenerator? = null
+        private var cipher : Cipher? = null
 
-        val fingerprintCryptoObject : FingerprintManagerCompat.CryptoObject?
-        get() {
+        var iv : IvParameterSpec? = null
+        val mode : CryptoMode
+        val alias : String = "LOCKALL_KEY_SECS"
+
+        fun getCipher() : Cipher? {
             return if (prepareKeyStore() && prepareCipher() && prepareKey() && initCipher())
-                FingerprintManagerCompat.CryptoObject(cipher)
+                cipher
             else
                 null
         }
-        var iv : IvParameterSpec? = null
-        val mode : CryptoMode
-        val alias : String
 
-        constructor(alias : String, iv : IvParameterSpec) {
+        constructor(iv : IvParameterSpec) {
             this.iv = iv
             mode = CryptoMode.DECRYPT
-            this.alias = alias
         }
 
-        constructor(alias : String) {
+        constructor() {
             mode = CryptoMode.ENCRYPT
-            this.alias = alias
         }
 
         private fun initCipher() : Boolean {
@@ -193,6 +170,7 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
                         .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
                         .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
                         .setUserAuthenticationRequired(true)
+                        .setUserAuthenticationValidityDurationSeconds(5)
                         .build()
                 keyGenerator!!.init(keyGenParameterSpec)
                 keyGenerator!!.generateKey()
@@ -216,37 +194,4 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
             return false
         }
     }
-
-    private class FingerprintHelper (private val mContext: Context,
-                                     private val cancellationSignal: CancellationSignal)
-        : FingerprintManagerCompat.AuthenticationCallback() {
-
-        lateinit var callback : (cipher : Cipher) -> Unit
-
-        fun startAuth(cryptoObject: FingerprintManagerCompat.CryptoObject, callback : (cipher : Cipher) -> Unit) {
-            this.callback = callback
-            val manager = FingerprintManagerCompat.from(mContext)
-            manager.authenticate(cryptoObject, 0, cancellationSignal, this, null)
-            Toast.makeText(mContext, "Finger!", Toast.LENGTH_LONG).show()
-        }
-
-        override fun onAuthenticationError(errMsgId: Int, errString: CharSequence?) {
-            Toast.makeText(mContext, errString, Toast.LENGTH_SHORT).show()
-        }
-
-        override fun onAuthenticationHelp(helpMsgId: Int, helpString: CharSequence?) {
-            Toast.makeText(mContext, helpString, Toast.LENGTH_SHORT).show()
-        }
-
-        override fun onAuthenticationSucceeded(result: FingerprintManagerCompat.AuthenticationResult?) {
-            callback(result!!.cryptoObject.cipher)
-            Toast.makeText(mContext, "success", Toast.LENGTH_SHORT).show()
-        }
-
-        override fun onAuthenticationFailed() {
-            Toast.makeText(mContext, "try again", Toast.LENGTH_SHORT).show()
-        }
-
-    }
-
 }
