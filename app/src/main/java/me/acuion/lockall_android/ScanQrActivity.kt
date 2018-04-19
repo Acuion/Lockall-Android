@@ -5,6 +5,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.SurfaceHolder
+import android.view.View.GONE
+import android.view.View.VISIBLE
 import com.google.android.gms.vision.CameraSource
 import com.google.android.gms.vision.Detector
 import com.google.android.gms.vision.barcode.Barcode
@@ -37,7 +39,7 @@ class ScanQrActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scanqr)
 
-        val expectedPrefix = intent.getStringExtra("prefix")
+        val resultIntent = Intent()
 
         qrDetecor = BarcodeDetector.Builder(this).setBarcodeFormats(Barcode.QR_CODE).build()
         cameraSource = CameraSource.Builder(this, qrDetecor).setRequestedPreviewSize(640, 480).setAutoFocusEnabled(true).build()
@@ -69,28 +71,42 @@ class ScanQrActivity : Activity() {
                 if (p0!!.detectedItems.size() == 0) {
                     txtresult.post {
                         txtresult.text = getString(R.string.scan_qr)
+                        buttonSafe.visibility = GONE
                     }
                     return
                 }
                 if (!p0.detectedItems.valueAt(0).displayValue.startsWith("LOCKALL:")) {
                     txtresult.post {
                         txtresult.text = getString(R.string.not_lockall_qr)
+                        buttonSafe.visibility = GONE
                     }
                     return
                 }
-                val resultIntent = Intent()
                 val data = p0.detectedItems.valueAt(0).displayValue.substring(8)
                 if (data.indexOf(":") == -1)
                     return
-                resultIntent.putExtra("prefix", data.split(':')[0])
+                val prefix = data.split(':')[0]
+                resultIntent.putExtra("prefix", prefix)
                 resultIntent.putExtra("data", data.split(':')[1])
-                setResult(RESULT_OK, resultIntent)
-                finish()
+                if (prefix == QrType.PAIRING.prefix) {
+                    txtresult.post {
+                        txtresult.text = getString(R.string.pair_qr)
+                        buttonSafe.visibility = VISIBLE
+                    }
+                } else {
+                    setResult(RESULT_OK, resultIntent)
+                    finish()
+                }
             }
 
             override fun release() {
             }
 
         })
+
+        buttonSafe.setOnClickListener {
+            setResult(RESULT_OK, resultIntent)
+            finish()
+        }
     }
 }

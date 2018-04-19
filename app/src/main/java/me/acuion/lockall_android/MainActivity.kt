@@ -24,11 +24,6 @@ class MainActivity : Activity() {
             ScanQr(42),
             UserAuth(100)
         }
-        enum class QrType(val prefix : String) {
-            PAIRING("PAIRING"),
-            STORE("STORE"),
-            PULL("PULL")
-        }
     }
 
     lateinit var keyguardManager : KeyguardManager

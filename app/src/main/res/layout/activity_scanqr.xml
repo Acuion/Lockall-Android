@@ -20,9 +20,30 @@
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"
         android:fontFamily="casual"
+        android:gravity="center"
         android:text="@string/scan_qr"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@+id/cameraPreview" />
+
+    <Button
+        android:id="@+id/buttonSafe"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:layout_marginBottom="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:background="@color/common_google_signin_btn_text_light_default"
+        android:elevation="0dp"
+        android:text="@string/i_m_safe_pair_me"
+        android:textColor="@android:color/background_light"
+        android:textSize="20sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="@+id/cameraPreview"
+        app:layout_constraintEnd_toEndOf="@+id/cameraPreview"
+        app:layout_constraintStart_toStartOf="@+id/cameraPreview"
+        app:layout_constraintTop_toTopOf="@+id/cameraPreview" />
+
 </android.support.constraint.ConstraintLayout>
