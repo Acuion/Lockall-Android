@@ -89,7 +89,7 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
 
         var iv : IvParameterSpec? = null
         val mode : CryptoMode
-        val alias : String = "LOCKALL_KEY_SECS"
+        val alias : String = "LOCKALL_KEY_32SEC"
         var invalidatedKey : Boolean = false
 
         fun getCipher(recreateKeyIfNeeded : Boolean) : Cipher? {
@@ -185,7 +185,7 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
                         .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
                         .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
                         .setUserAuthenticationRequired(true)
-                        .setUserAuthenticationValidityDurationSeconds(5)
+                        .setUserAuthenticationValidityDurationSeconds(32)
                         .build()
                 keyGenerator!!.init(keyGenParameterSpec)
                 keyGenerator!!.generateKey()

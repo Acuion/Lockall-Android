@@ -22,6 +22,7 @@ class MainActivity : Activity() {
     companion object {
         enum class RequestCodeEnum(val code : Int) {
             ScanQr(42),
+            ProfileSelect(77),
             UserAuth(100)
         }
     }
@@ -29,6 +30,7 @@ class MainActivity : Activity() {
     lateinit var keyguardManager : KeyguardManager
 
     lateinit var systemwideAuthSuccessCallback : () -> Unit
+    lateinit var systemwideProfileSelectSuccessCallback : (selectedProfile : String) -> Unit
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (resultCode == RESULT_CANCELED) {
@@ -38,6 +40,10 @@ class MainActivity : Activity() {
         when (requestCode) {
             RequestCodeEnum.UserAuth.code -> {
                 systemwideAuthSuccessCallback()
+            }
+
+            RequestCodeEnum.ProfileSelect.code -> {
+                systemwideProfileSelectSuccessCallback(data!!.getStringExtra("profile")!!)
             }
 
             RequestCodeEnum.ScanQr.code -> {
@@ -86,19 +92,25 @@ class MainActivity : Activity() {
                                 return@authUser
                             }
                             val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
-                            storage.put(qrContent.resourceid, qrContent.password)
-                            try {
-                                ejsm.data = gson.toJsonTree(storage).asJsonObject
-                            } catch (ex: Exception) {
-                                ex.printStackTrace()
-                                Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
-                                return@authUser
+                            var currentProfiles = storage.getProfilesForResource(qrContent.resourceid)
+                            if (currentProfiles == null)
+                                currentProfiles = Array(0, {_ -> ""})
+                            selectProfile(qrContent.resourceid, currentProfiles,
+                                    true) {
+                                storage.put(qrContent.resourceid, it, qrContent.password)
+                                try {
+                                    ejsm.data = gson.toJsonTree(storage).asJsonObject
+                                } catch (ex: Exception) {
+                                    ex.printStackTrace()
+                                    Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
+                                    return@selectProfile
+                                }
+                                val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                                        qrData.secondComponent)
+                                val message = NetworkMessage(key,
+                                        gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
+                                message.send(qrData.hostAddress!!, qrData.hostPort)
                             }
-                            val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                    qrData.secondComponent)
-                            val message = NetworkMessage(key,
-                                    gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
-                            message.send(qrData.hostAddress!!, qrData.hostPort)
                         }
                         QrType.PULL.prefix -> { // pull
                             val qrContent = gson.fromJson(qrData.userDataJson, MessageWithResourceid::class.java)!!
@@ -110,16 +122,20 @@ class MainActivity : Activity() {
                                 return@authUser
                             }
                             val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
-                            val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                    qrData.secondComponent)
-                            val pass = storage.getPass(qrContent.resourceid)
-                            if (pass == null) {
+                            val currentProfiles = storage.getProfilesForResource(qrContent.resourceid)
+                            if (currentProfiles == null) {
                                 Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
                                 return@authUser
                             }
-                            val message = NetworkMessage(key,
-                                    gson.toJsonTree(MessageWithPassword(qrContent.resourceid, pass)).asJsonObject)
-                            message.send(qrData.hostAddress!!, qrData.hostPort)
+                            selectProfile(qrContent.resourceid, currentProfiles,
+                                    false) {
+                                val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                                        qrData.secondComponent)
+                                val pass = storage.getPass(qrContent.resourceid, it)!!
+                                val message = NetworkMessage(key,
+                                        gson.toJsonTree(MessageWithPassword(qrContent.resourceid, pass)).asJsonObject)
+                                message.send(qrData.hostAddress!!, qrData.hostPort)
+                            }
                         }
                         else -> {
                             Toast.makeText(applicationContext, "Unrecognized QR type", Toast.LENGTH_LONG).show()
@@ -138,6 +154,20 @@ class MainActivity : Activity() {
         } else {
             systemwideAuthSuccessCallback()
         }
+    }
+
+    fun selectProfile(resourceName : String, profiles : Array<String>, allowProfileCreation : Boolean,
+                      successCallback : (selectedProfile : String) -> Unit) {
+        systemwideProfileSelectSuccessCallback = successCallback
+        if (!allowProfileCreation && profiles.size == 1) {
+            systemwideProfileSelectSuccessCallback(profiles[0])
+            return
+        }
+        val selectIntent = Intent(applicationContext, ProfileSelectorActivity::class.java)
+        selectIntent.putExtra("allowProfileCreation", allowProfileCreation)
+        selectIntent.putExtra("resourceName", resourceName)
+        selectIntent.putExtra("accountsList", profiles)
+        startActivityForResult(selectIntent, RequestCodeEnum.ProfileSelect.code)
     }
 
     fun launchQrActivity() {
