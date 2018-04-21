@@ -49,96 +49,102 @@ class MainActivity : Activity() {
             RequestCodeEnum.ScanQr.code -> {
                 val gson = Gson()
                 authUser {
-                    val firstComponentsEjsm = EncryptedJsonStorageManager(applicationContext,
-                            EncryptedJsonStorageManager.Companion.Filename.FirstComponentsStorage)
-                    val fcjo = firstComponentsEjsm.data
-                    if (fcjo == null) {
-                        Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
-                        return@authUser
-                    }
-                    val fcstorage = gson.fromJson(fcjo, FirstComponentsStorage::class.java)
-
-                    val qrData = QrMessage(data!!.getStringExtra("data")!!, fcstorage)
-                    val qrPrefix = data.getStringExtra("prefix")!!
-                    if (qrData.firstComponent == null) {
-                        Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
-                        return@authUser
-                    }
-
-                    when (qrPrefix) {
-                        QrType.PAIRING.prefix -> {
-                            val qrContent = gson.fromJson(qrData.userDataJson, MessageWithName::class.java)!!
-
-                            fcstorage.put(qrContent.name, qrData.firstComponent!!)
-                            try {
-                                firstComponentsEjsm.data = gson.toJsonTree(fcstorage).asJsonObject
-                            } catch (ex: Exception) {
-                                Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
+                    when (data!!.getStringExtra("mode")!!) {
+                        ScanQrActivity.QrScanMode.LOCKALL.mode -> {
+                            val firstComponentsEjsm = EncryptedJsonStorageManager(applicationContext,
+                                    EncryptedJsonStorageManager.Companion.Filename.FirstComponentsStorage)
+                            val fcjo = firstComponentsEjsm.data
+                            if (fcjo == null) {
+                                Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
                                 return@authUser
                             }
-                            val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                    qrData.secondComponent)
-                            val message = NetworkMessage(key,
-                                    gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
-                            message.send(qrData.hostAddress!!, qrData.hostPort)
-                        }
-                        QrType.STORE.prefix -> { // store
-                            val qrContent = gson.fromJson(qrData.userDataJson, MessageWithPassword::class.java)!!
+                            val fcstorage = gson.fromJson(fcjo, FirstComponentsStorage::class.java)
 
-                            val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
-                            val pjo = ejsm.data
-                            if (pjo == null) {
-                                Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
+                            val qrData = QrMessage(data.getStringExtra("data")!!, fcstorage)
+                            val qrPrefix = data.getStringExtra("prefix")!!
+                            if (qrData.firstComponent == null) {
+                                Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
                                 return@authUser
                             }
-                            val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
-                            var currentProfiles = storage.getProfilesForResource(qrContent.resourceid)
-                            if (currentProfiles == null)
-                                currentProfiles = Array(0, {_ -> ""})
-                            selectProfile(qrContent.resourceid, currentProfiles,
-                                    true) {
-                                storage.put(qrContent.resourceid, it, qrContent.password)
-                                try {
-                                    ejsm.data = gson.toJsonTree(storage).asJsonObject
-                                } catch (ex: Exception) {
-                                    ex.printStackTrace()
-                                    Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
-                                    return@selectProfile
+
+                            when (qrPrefix) {
+                                QrType.PAIRING.prefix -> {
+                                    val qrContent = gson.fromJson(qrData.userDataJson, MessageWithName::class.java)!!
+
+                                    fcstorage.put(qrContent.name, qrData.firstComponent!!)
+                                    try {
+                                        firstComponentsEjsm.data = gson.toJsonTree(fcstorage).asJsonObject
+                                    } catch (ex: Exception) {
+                                        Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
+                                        return@authUser
+                                    }
+                                    val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                                            qrData.secondComponent)
+                                    val message = NetworkMessage(key,
+                                            gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
+                                    message.send(qrData.hostAddress!!, qrData.hostPort)
                                 }
-                                val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                        qrData.secondComponent)
-                                val message = NetworkMessage(key,
-                                        gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
-                                message.send(qrData.hostAddress!!, qrData.hostPort)
-                            }
-                        }
-                        QrType.PULL.prefix -> { // pull
-                            val qrContent = gson.fromJson(qrData.userDataJson, MessageWithResourceid::class.java)!!
+                                QrType.STORE.prefix -> {
+                                    // store
+                                    val qrContent = gson.fromJson(qrData.userDataJson, MessageWithPassword::class.java)!!
 
-                            val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
-                            val pjo = ejsm.data
-                            if (pjo == null) {
-                                Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
-                                return@authUser
+                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
+                                    val pjo = ejsm.data
+                                    if (pjo == null) {
+                                        Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
+                                        return@authUser
+                                    }
+                                    val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
+                                    var currentProfiles = storage.getProfilesForResource(qrContent.resourceid)
+                                    if (currentProfiles == null)
+                                        currentProfiles = Array(0, { _ -> "" })
+                                    selectProfile(qrContent.resourceid, currentProfiles,
+                                            true) {
+                                        storage.put(qrContent.resourceid, it, qrContent.password)
+                                        try {
+                                            ejsm.data = gson.toJsonTree(storage).asJsonObject
+                                        } catch (ex: Exception) {
+                                            ex.printStackTrace()
+                                            Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
+                                            return@selectProfile
+                                        }
+                                        val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                                                qrData.secondComponent)
+                                        val message = NetworkMessage(key,
+                                                gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
+                                        message.send(qrData.hostAddress!!, qrData.hostPort)
+                                    }
+                                }
+                                QrType.PULL.prefix -> {
+                                    // pull
+                                    val qrContent = gson.fromJson(qrData.userDataJson, MessageWithResourceid::class.java)!!
+
+                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
+                                    val pjo = ejsm.data
+                                    if (pjo == null) {
+                                        Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
+                                        return@authUser
+                                    }
+                                    val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
+                                    val currentProfiles = storage.getProfilesForResource(qrContent.resourceid)
+                                    if (currentProfiles == null) {
+                                        Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
+                                        return@authUser
+                                    }
+                                    selectProfile(qrContent.resourceid, currentProfiles,
+                                            false) {
+                                        val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                                                qrData.secondComponent)
+                                        val pass = storage.getPass(qrContent.resourceid, it)!!
+                                        val message = NetworkMessage(key,
+                                                gson.toJsonTree(MessageWithPassword(qrContent.resourceid, pass)).asJsonObject)
+                                        message.send(qrData.hostAddress!!, qrData.hostPort)
+                                    }
+                                }
+                                else -> {
+                                    Toast.makeText(applicationContext, "Unrecognized QR type", Toast.LENGTH_LONG).show()
+                                }
                             }
-                            val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
-                            val currentProfiles = storage.getProfilesForResource(qrContent.resourceid)
-                            if (currentProfiles == null) {
-                                Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
-                                return@authUser
-                            }
-                            selectProfile(qrContent.resourceid, currentProfiles,
-                                    false) {
-                                val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                        qrData.secondComponent)
-                                val pass = storage.getPass(qrContent.resourceid, it)!!
-                                val message = NetworkMessage(key,
-                                        gson.toJsonTree(MessageWithPassword(qrContent.resourceid, pass)).asJsonObject)
-                                message.send(qrData.hostAddress!!, qrData.hostPort)
-                            }
-                        }
-                        else -> {
-                            Toast.makeText(applicationContext, "Unrecognized QR type", Toast.LENGTH_LONG).show()
                         }
                     }
                 }

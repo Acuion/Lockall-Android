@@ -76,12 +76,32 @@ class ScanQrActivity : Activity() {
     }
 
     fun otpQrDetectionsHander(p0: Detector.Detections<Barcode>?) {
-
+        if (p0!!.detectedItems.size() == 0) {
+            txtresult.post {
+                txtresult.text = getString(R.string.scan_qr)
+                needConfirmation = false
+            }
+            return
+        }
+        if (!p0.detectedItems.valueAt(0).displayValue.startsWith("otpauth://")) {
+            txtresult.post {
+                txtresult.text = getString(R.string.not_otp_qr)
+                needConfirmation = false
+            }
+            return
+        }
+        resultIntent.putExtra("data", p0.detectedItems.valueAt(0).displayValue)
+        txtresult.post {
+            txtresult.text = getString(R.string.otp_qr)
+            needConfirmation = true
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_scanqr)
+
+        resultIntent.putExtra("mode", intent.getStringExtra("mode")!!)
 
         qrDetecor = BarcodeDetector.Builder(this).setBarcodeFormats(Barcode.QR_CODE).build()
         cameraSource = CameraSource.Builder(this, qrDetecor).setRequestedPreviewSize(640, 480).setAutoFocusEnabled(true).build()

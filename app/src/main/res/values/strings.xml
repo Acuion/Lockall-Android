@@ -7,4 +7,7 @@
     <string name="title_activity_profile_selector">ProfileSelectorActivity</string>
 
     <string name="accs_available_header">Available accounts for %s</string>
+
+    <string name="not_otp_qr">Hey, it is not an OTP QR (☉_☉)</string>
+    <string name="otp_qr">Do you really want to add this OTP? Do it in a place where nobody can steal your QR or your 2FA may become useless! (⌐■_■)\nTap the camera to confirm.</string>
 </resources>
