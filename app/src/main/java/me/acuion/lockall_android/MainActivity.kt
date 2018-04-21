@@ -18,6 +18,10 @@ import me.acuion.lockall_android.messages.Password.MessageWithResourceid
 import me.acuion.lockall_android.storages.FirstComponentsStorage
 import me.acuion.lockall_android.storages.OtpDataStorage
 import me.acuion.lockall_android.storages.PasswordsStorage
+import org.apache.commons.codec.binary.Base32
+import java.nio.ByteBuffer
+import kotlin.experimental.and
+import kotlin.experimental.or
 
 
 class MainActivity : Activity() {
@@ -164,9 +168,20 @@ class MainActivity : Activity() {
                                         val secret = storage.getSecretFrom(it)
                                         val currTime = (System.currentTimeMillis() / 1000) / 30 // 30 sec period
 
+                                        val secretBytes = Base32().decode(secret)
+                                        val timeBytes = ByteBuffer.allocate(8)
+                                        timeBytes.putLong(currTime)
+                                        val hmacBytes = EncryptionUtils.hmacSha1(timeBytes.array(), secretBytes)
+                                        val offset = (hmacBytes.last() and 0x0F).toInt()
+                                        var res1 = (hmacBytes[offset]).toInt().and(0x7F).shl(24)
+                                        var res2 = (hmacBytes[offset + 1]).toInt().and(0xFF).shl(16)
+                                        var res3 = (hmacBytes[offset + 2]).toInt().and(0xFF).shl(8)
+                                        var res4 = (hmacBytes[offset + 3] ).toInt().and(0xFF)
+                                        val result = res1.or(res2).or(res3).or(res4)
+                                        val pass = (result.rem(1000000)).toString()
+
                                         val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
                                                 qrData.secondComponent)
-                                        val pass = "000000"
                                         val message = NetworkMessage(key,
                                                 gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
                                         message.send(qrData.hostAddress!!, qrData.hostPort)
