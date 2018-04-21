@@ -118,7 +118,7 @@ class MainActivity : Activity() {
                                     }
                                 }
                                 QrType.PULL.prefix -> {
-                                    // pull
+                                    // pull password
                                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithResourceid::class.java)!!
 
                                     val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
@@ -140,6 +140,35 @@ class MainActivity : Activity() {
                                         val pass = storage.getPass(qrContent.resourceid, it)!!
                                         val message = NetworkMessage(key,
                                                 gson.toJsonTree(MessageWithPassword(qrContent.resourceid, pass)).asJsonObject)
+                                        message.send(qrData.hostAddress!!, qrData.hostPort)
+                                    }
+                                }
+                                QrType.OTP.prefix -> {
+                                    // pull otp
+
+                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.OtpsStorage)
+                                    val pjo = ejsm.data
+                                    if (pjo == null) {
+                                        Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
+                                        return@authUser
+                                    }
+                                    val storage = gson.fromJson(pjo, OtpDataStorage::class.java)
+                                    val currentProfiles = storage.getIssuerProfileKeys()
+                                    if (currentProfiles.isEmpty()) {
+                                        Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
+                                        return@authUser
+                                    }
+                                    // TODO("resource name")
+                                    selectProfile("OTP", currentProfiles,
+                                            false) {
+                                        val secret = storage.getSecretFrom(it)
+                                        val currTime = (System.currentTimeMillis() / 1000) / 30 // 30 sec period
+
+                                        val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
+                                                qrData.secondComponent)
+                                        val pass = "000000"
+                                        val message = NetworkMessage(key,
+                                                gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
                                         message.send(qrData.hostAddress!!, qrData.hostPort)
                                     }
                                 }
