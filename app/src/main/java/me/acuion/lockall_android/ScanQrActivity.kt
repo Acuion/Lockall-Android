@@ -83,7 +83,7 @@ class ScanQrActivity : Activity() {
             }
             return
         }
-        if (!p0.detectedItems.valueAt(0).displayValue.startsWith("otpauth://")) {
+        if (!p0.detectedItems.valueAt(0).displayValue.startsWith("otpauth://totp/")) {
             txtresult.post {
                 txtresult.text = getString(R.string.not_otp_qr)
                 needConfirmation = false

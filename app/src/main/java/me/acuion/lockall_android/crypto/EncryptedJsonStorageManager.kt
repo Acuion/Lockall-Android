@@ -21,11 +21,10 @@ import android.support.v4.os.CancellationSignal
 
 
 class EncryptedJsonStorageManager(val context : Context, val encfile : Filename) {
-    companion object {
-        enum class Filename(val fname : String) {
-            FirstComponentsStorage("firstComponentsStorage"),
-            PasswordsStorage("passwordsStorage")
-        }
+    enum class Filename(val fname : String) {
+        FirstComponentsStorage("firstComponentsStorage"),
+        PasswordsStorage("passwordsStorage"),
+        OtpsStorage("otpsStorage")
     }
 
     var data : JsonObject?

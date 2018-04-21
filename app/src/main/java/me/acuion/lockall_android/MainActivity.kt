@@ -11,10 +11,12 @@ import me.acuion.lockall_android.crypto.EncryptionUtils
 import me.acuion.lockall_android.messages.pairing.MessageWithName
 import android.app.KeyguardManager
 import android.content.Context
+import android.net.Uri
 import me.acuion.lockall_android.messages.MessageStatus
 import me.acuion.lockall_android.messages.Password.MessageWithPassword
 import me.acuion.lockall_android.messages.Password.MessageWithResourceid
 import me.acuion.lockall_android.storages.FirstComponentsStorage
+import me.acuion.lockall_android.storages.OtpDataStorage
 import me.acuion.lockall_android.storages.PasswordsStorage
 
 
@@ -52,10 +54,10 @@ class MainActivity : Activity() {
                     when (data!!.getStringExtra("mode")!!) {
                         ScanQrActivity.QrScanMode.LOCKALL.mode -> {
                             val firstComponentsEjsm = EncryptedJsonStorageManager(applicationContext,
-                                    EncryptedJsonStorageManager.Companion.Filename.FirstComponentsStorage)
+                                    EncryptedJsonStorageManager.Filename.FirstComponentsStorage)
                             val fcjo = firstComponentsEjsm.data
                             if (fcjo == null) {
-                                Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(applicationContext, "Cannot load keybase storage", Toast.LENGTH_SHORT).show()
                                 return@authUser
                             }
                             val fcstorage = gson.fromJson(fcjo, FirstComponentsStorage::class.java)
@@ -88,7 +90,7 @@ class MainActivity : Activity() {
                                     // store
                                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithPassword::class.java)!!
 
-                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
+                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
                                     val pjo = ejsm.data
                                     if (pjo == null) {
                                         Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
@@ -119,7 +121,7 @@ class MainActivity : Activity() {
                                     // pull
                                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithResourceid::class.java)!!
 
-                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Companion.Filename.PasswordsStorage)
+                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
                                     val pjo = ejsm.data
                                     if (pjo == null) {
                                         Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
@@ -145,6 +147,42 @@ class MainActivity : Activity() {
                                     Toast.makeText(applicationContext, "Unrecognized QR type", Toast.LENGTH_LONG).show()
                                 }
                             }
+                        }
+                        ScanQrActivity.QrScanMode.OTP.mode -> {
+                            //TODO("errors")
+                            val totpUri = Uri.parse(data.getStringExtra("data")!!)
+                            val secret = totpUri.getQueryParameter("secret")!!
+                            val path = totpUri.path.substring(1)
+                            var issuer = totpUri.getQueryParameter("issuer")
+                            lateinit var account : String
+                            if (path.contains(':')) {
+                                if (issuer == null)
+                                    issuer = path.split(':')[0]
+                                account = path.split(':')[1]
+                            } else {
+                                if (issuer == null)
+                                    issuer = "unknown"
+                                account = path
+                            }
+
+                            val otpEjsm = EncryptedJsonStorageManager(applicationContext,
+                                    EncryptedJsonStorageManager.Filename.OtpsStorage)
+                            val otpsStorageJson = otpEjsm.data
+                            if (otpsStorageJson == null) {
+                                Toast.makeText(applicationContext, "Cannot load OTPs storage", Toast.LENGTH_SHORT).show()
+                                return@authUser
+                            }
+                            val otpsStorage = gson.fromJson(otpsStorageJson, OtpDataStorage::class.java)
+                            otpsStorage.put(issuer, account, secret)
+
+                            try {
+                                otpEjsm.data = gson.toJsonTree(otpsStorage).asJsonObject
+                            } catch (ex: Exception) {
+                                Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
+                                return@authUser
+                            }
+
+                            Toast.makeText(applicationContext, "OTP generator stored for $account from $issuer", Toast.LENGTH_SHORT).show()
                         }
                     }
                 }
