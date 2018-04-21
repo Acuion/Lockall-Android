@@ -1,19 +1,19 @@
 package me.acuion.lockall_android.storages
 
 class OtpDataStorage {
-    private val map = HashMap<Pair<String, String>, String>()
+    private val map = HashMap<String, String>()
 
-    fun getIssuerProfileKeys() : Array<Pair<String, String>>
+    fun getIssuerProfileKeys() : Array<String>
     {
         return map.keys.toTypedArray()
     }
 
     fun put(issuer : String, profile : String, secret : String) {
-        val ipKey = Pair(issuer, profile)
+        val ipKey = "$profile ($issuer)"
         map[ipKey] = secret
     }
 
-    fun getSecretFrom(ipKey : Pair<String, String>) : String {
-        return map[ipKey]!!
+    fun getSecretFrom(keyStr : String) : String {
+        return map[keyStr]!!
     }
 }

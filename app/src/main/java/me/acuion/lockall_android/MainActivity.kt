@@ -149,22 +149,27 @@ class MainActivity : Activity() {
                             }
                         }
                         ScanQrActivity.QrScanMode.OTP.mode -> {
-                            //TODO("errors")
-                            val totpUri = Uri.parse(data.getStringExtra("data")!!)
-                            val secret = totpUri.getQueryParameter("secret")!!
-                            val path = totpUri.path.substring(1)
-                            var issuer = totpUri.getQueryParameter("issuer")
+                            lateinit var secret : String
                             lateinit var account : String
-                            if (path.contains(':')) {
-                                if (issuer == null)
-                                    issuer = path.split(':')[0]
-                                account = path.split(':')[1]
-                            } else {
-                                if (issuer == null)
-                                    issuer = "unknown"
-                                account = path
+                            lateinit var issuer : String
+                            try {
+                                val totpUri = Uri.parse(data.getStringExtra("data")!!)
+                                secret = totpUri.getQueryParameter("secret")!!
+                                val path = totpUri.path.substring(1)
+                                issuer = totpUri.getQueryParameter("issuer")
+                                if (path.contains(':')) {
+                                    if (issuer == null)
+                                        issuer = path.split(':')[0]
+                                    account = path.split(':')[1]
+                                } else {
+                                    if (issuer == null)
+                                        issuer = "unknown"
+                                    account = path
+                                }
+                            } catch (ex : Exception) {
+                                Toast.makeText(applicationContext, "Error parsing OTP QR", Toast.LENGTH_SHORT).show()
+                                return@authUser
                             }
-
                             val otpEjsm = EncryptedJsonStorageManager(applicationContext,
                                     EncryptedJsonStorageManager.Filename.OtpsStorage)
                             val otpsStorageJson = otpEjsm.data
