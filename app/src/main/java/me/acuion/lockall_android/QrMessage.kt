@@ -71,6 +71,7 @@ class QrMessage(base64Data: String, fcstorage : FirstComponentsStorage) {
         } else {
             fcstorage.firstComponents.forEach {
                 if (tryToDecrypt(encryptedBody, EncryptionUtils.produce256BitsFromComponents(it, secondComponent), iv)) {
+                    firstComponent = it
                     return@forEach
                 }
             }
