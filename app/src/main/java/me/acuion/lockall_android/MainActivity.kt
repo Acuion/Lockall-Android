@@ -170,8 +170,9 @@ class MainActivity : Activity() {
         startActivityForResult(selectIntent, RequestCodeEnum.ProfileSelect.code)
     }
 
-    fun launchQrActivity() {
+    fun launchQrActivity(mode : ScanQrActivity.QrScanMode) {
         val qrIntent = Intent(applicationContext, ScanQrActivity::class.java)
+        qrIntent.putExtra("mode", mode.mode)
         startActivityForResult(qrIntent, RequestCodeEnum.ScanQr.code)
     }
 
@@ -187,7 +188,11 @@ class MainActivity : Activity() {
         }
 
         buttonScan.setOnClickListener {
-            launchQrActivity()
+            launchQrActivity(ScanQrActivity.QrScanMode.LOCKALL)
+        }
+
+        buttonOtp.setOnClickListener {
+            launchQrActivity(ScanQrActivity.QrScanMode.OTP)
         }
     }
 }
