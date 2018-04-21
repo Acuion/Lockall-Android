@@ -173,12 +173,12 @@ class MainActivity : Activity() {
                                         timeBytes.putLong(currTime)
                                         val hmacBytes = EncryptionUtils.hmacSha1(timeBytes.array(), secretBytes)
                                         val offset = (hmacBytes.last() and 0x0F).toInt()
-                                        var res1 = (hmacBytes[offset]).toInt().and(0x7F).shl(24)
-                                        var res2 = (hmacBytes[offset + 1]).toInt().and(0xFF).shl(16)
-                                        var res3 = (hmacBytes[offset + 2]).toInt().and(0xFF).shl(8)
-                                        var res4 = (hmacBytes[offset + 3] ).toInt().and(0xFF)
+                                        val res1 = (hmacBytes[offset]).toInt().and(0x7F).shl(24)
+                                        val res2 = (hmacBytes[offset + 1]).toInt().and(0xFF).shl(16)
+                                        val res3 = (hmacBytes[offset + 2]).toInt().and(0xFF).shl(8)
+                                        val res4 = (hmacBytes[offset + 3] ).toInt().and(0xFF)
                                         val result = res1.or(res2).or(res3).or(res4)
-                                        val pass = (result.rem(1000000)).toString()
+                                        val pass = (result.rem(1000000)).toString().padStart(6, '0')
 
                                         val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
                                                 qrData.secondComponent)
