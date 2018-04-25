@@ -61,9 +61,17 @@ class ScanQrActivity : Activity() {
         val data = p0.detectedItems.valueAt(0).displayValue.substring(8)
         if (data.indexOf(":") == -1)
             return
-        val prefix = data.split(':')[0]
+        val dataParts = data.split(':')
+        var prefix = dataParts[0]
+        var base64Data = dataParts[1]
+        if (prefix.startsWith("PLUGIN"))
+        {
+            prefix = prefix.substring(6)
+            base64Data = dataParts[2]
+            resultIntent.putExtra("overrideResourceid", dataParts[1])
+        }
         resultIntent.putExtra("prefix", prefix)
-        resultIntent.putExtra("data", data.split(':')[1])
+        resultIntent.putExtra("data", base64Data)
         if (prefix == QrType.PAIRING.prefix) {
             txtresult.post {
                 txtresult.text = getString(R.string.pair_qr)

@@ -68,6 +68,7 @@ class MainActivity : Activity() {
 
                             val qrData = QrMessage(data.getStringExtra("data")!!, fcstorage)
                             val qrPrefix = data.getStringExtra("prefix")!!
+                            val qrOverrideResourceid = data.getStringExtra("overrideResourceid")
                             if (qrData.firstComponent == null) {
                                 Toast.makeText(applicationContext, "Cannot find corresponding keybase. Have you paired with the device?", Toast.LENGTH_SHORT).show()
                                 return@authUser
@@ -94,6 +95,8 @@ class MainActivity : Activity() {
                                     // store
                                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithPassword::class.java)!!
 
+                                    val usedResourceid = qrOverrideResourceid ?: qrContent.resourceid
+
                                     val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
                                     val pjo = ejsm.data
                                     if (pjo == null) {
@@ -101,12 +104,12 @@ class MainActivity : Activity() {
                                         return@authUser
                                     }
                                     val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
-                                    var currentProfiles = storage.getProfilesForResource(qrContent.resourceid)
+                                    var currentProfiles = storage.getProfilesForResource(usedResourceid)
                                     if (currentProfiles == null)
                                         currentProfiles = Array(0, { _ -> "" })
-                                    selectProfile(qrContent.resourceid, currentProfiles,
+                                    selectProfile(usedResourceid, currentProfiles,
                                             true) {
-                                        storage.put(qrContent.resourceid, it, qrContent.password)
+                                        storage.put(usedResourceid, it, qrContent.password)
                                         try {
                                             ejsm.data = gson.toJsonTree(storage).asJsonObject
                                         } catch (ex: Exception) {
@@ -125,6 +128,8 @@ class MainActivity : Activity() {
                                     // pull password
                                     val qrContent = gson.fromJson(qrData.userDataJson, MessageWithResourceid::class.java)!!
 
+                                    val usedResourceid = qrOverrideResourceid ?: qrContent.resourceid
+
                                     val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
                                     val pjo = ejsm.data
                                     if (pjo == null) {
@@ -132,18 +137,18 @@ class MainActivity : Activity() {
                                         return@authUser
                                     }
                                     val storage = gson.fromJson(pjo, PasswordsStorage::class.java)
-                                    val currentProfiles = storage.getProfilesForResource(qrContent.resourceid)
+                                    val currentProfiles = storage.getProfilesForResource(usedResourceid)
                                     if (currentProfiles == null) {
                                         Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
                                         return@authUser
                                     }
-                                    selectProfile(qrContent.resourceid, currentProfiles,
+                                    selectProfile(usedResourceid, currentProfiles,
                                             false) {
                                         val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
                                                 qrData.secondComponent)
-                                        val pass = storage.getPass(qrContent.resourceid, it)!!
+                                        val pass = storage.getPass(usedResourceid, it)!!
                                         val message = NetworkMessage(key,
-                                                gson.toJsonTree(MessageWithPassword(qrContent.resourceid, pass)).asJsonObject)
+                                                gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
                                         message.send(qrData.hostAddress!!, qrData.hostPort)
                                     }
                                 }
