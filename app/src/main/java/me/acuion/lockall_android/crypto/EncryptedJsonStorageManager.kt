@@ -18,6 +18,7 @@ import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import android.widget.Toast
 import android.support.v4.os.CancellationSignal
+import javax.crypto.spec.GCMParameterSpec
 
 
 class EncryptedJsonStorageManager(val context : Context, val encfile : Filename) {
@@ -37,12 +38,12 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
 
         val buffer = ByteBuffer.wrap(file.readBytes())
 
-        val iv = ByteArray(16) // 128bit block
+        val iv = ByteArray(12) // for GCM
         buffer.get(iv)
         val encryptedData = ByteArray(buffer.remaining())
         buffer.get(encryptedData)
 
-        val ahelper = CryptoHelper(IvParameterSpec(iv))
+        val ahelper = CryptoHelper(GCMParameterSpec(128, iv))
         val cipher = ahelper.getCipher(false)
         if (cipher == null) {
             if (ahelper.invalidatedKey) {
@@ -86,9 +87,9 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
         private var keyGenerator : KeyGenerator? = null
         private var cipher : Cipher? = null
 
-        var iv : IvParameterSpec? = null
+        var iv : GCMParameterSpec? = null
         val mode : CryptoMode
-        val alias : String = "LOCKALL_KEY_32SEC"
+        val alias : String = "LOCKALL_KEY_32SEC_GCM"
         var invalidatedKey : Boolean = false
 
         fun getCipher(recreateKeyIfNeeded : Boolean) : Cipher? {
@@ -104,7 +105,7 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
             return null
         }
 
-        constructor(iv : IvParameterSpec) {
+        constructor(iv : GCMParameterSpec) {
             this.iv = iv
             mode = CryptoMode.DECRYPT
         }
@@ -155,7 +156,7 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
             if (cipher != null)
                 return true
             try {
-                cipher = Cipher.getInstance("AES/CBC/PKCS7Padding")
+                cipher = Cipher.getInstance("AES/GCM/NoPadding")
                 return true
             }
             catch (ex : Exception) {
@@ -181,8 +182,8 @@ class EncryptedJsonStorageManager(val context : Context, val encfile : Filename)
                 val keyGenParameterSpec = KeyGenParameterSpec.Builder(alias,
                         KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
                         .setKeySize(256)
-                        .setBlockModes(KeyProperties.BLOCK_MODE_CBC)
-                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_PKCS7)
+                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                         .setUserAuthenticationRequired(true)
                         .setUserAuthenticationValidityDurationSeconds(32)
                         .build()
