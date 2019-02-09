@@ -5,8 +5,6 @@ import android.app.Activity
 import android.view.View.*
 
 import kotlinx.android.synthetic.main.activity_profile_selector.*
-import kotlinx.coroutines.experimental.delay
-import kotlinx.coroutines.experimental.launch
 import android.widget.ArrayAdapter
 import android.content.Intent
 import android.widget.AdapterView.OnItemClickListener
@@ -14,6 +12,9 @@ import android.app.AlertDialog
 import android.content.DialogInterface
 import android.text.InputType
 import android.widget.EditText
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class ProfileSelectorActivity : Activity() {
 
@@ -63,7 +64,7 @@ class ProfileSelectorActivity : Activity() {
             builder.show()
         }
 
-        launch {
+        GlobalScope.launch {
             for (i in 1..60) {
                 runOnUiThread {
                     progressBar.incrementProgressBy(-1)

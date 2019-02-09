@@ -1,9 +1,9 @@
 package me.acuion.lockall_android
 
-import com.google.gson.JsonElement
 import com.google.gson.JsonObject
-import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.launch
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import me.acuion.lockall_android.crypto.EncryptionUtils
 import java.net.InetAddress
 import java.net.Socket
@@ -28,7 +28,7 @@ class NetworkMessage(key : ByteArray, userDataJson : JsonObject) {
     }
 
     fun send(hostIp : InetAddress, hostPort : Int) : Job {
-        return launch {//TODO("check it")
+        return GlobalScope.launch {//TODO("check it")
             val toHostConn = Socket(hostIp, hostPort)
             toHostConn.getOutputStream().write(readyMessage)
             toHostConn.close()
