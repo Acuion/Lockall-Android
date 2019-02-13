@@ -88,7 +88,7 @@ class MainActivity : Activity() {
                                             qrData.secondComponent)
                                     val message = NetworkMessage(key,
                                             gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
-                                    message.send(qrData.hostTcpAddress!!, qrData.hostTcpPort)
+                                    message.send(qrData.pcNetworkInfo)
                                 }
                                 QrType.STORE.prefix -> {
                                     // store
@@ -120,7 +120,7 @@ class MainActivity : Activity() {
                                                 qrData.secondComponent)
                                         val message = NetworkMessage(key,
                                                 gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
-                                        message.send(qrData.hostTcpAddress!!, qrData.hostTcpPort)
+                                        message.send(qrData.pcNetworkInfo)
                                     }
                                 }
                                 QrType.PULL.prefix -> {
@@ -148,7 +148,7 @@ class MainActivity : Activity() {
                                         val pass = storage.getPass(usedResourceid, it)!!
                                         val message = NetworkMessage(key,
                                                 gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
-                                        message.send(qrData.hostTcpAddress!!, qrData.hostTcpPort)
+                                        message.send(qrData.pcNetworkInfo)
                                     }
                                 }
                                 QrType.OTP.prefix -> {
@@ -188,7 +188,7 @@ class MainActivity : Activity() {
                                                 qrData.secondComponent)
                                         val message = NetworkMessage(key,
                                                 gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
-                                        message.send(qrData.hostTcpAddress!!, qrData.hostTcpPort)
+                                        message.send(qrData.pcNetworkInfo)
                                     }
                                 }
                                 else -> {

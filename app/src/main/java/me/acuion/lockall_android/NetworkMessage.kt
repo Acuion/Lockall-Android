@@ -10,8 +10,17 @@ import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.Charset
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.widget.Toast
+import android.support.v4.app.ActivityCompat.startActivityForResult
+import android.content.Intent
+import java.util.*
+
 
 class NetworkMessage(key : ByteArray, userDataJson : JsonObject) {
+    val REQUEST_ENABLE_BT = 1
+
     val readyMessage : ByteArray
 
     init {
@@ -27,11 +36,35 @@ class NetworkMessage(key : ByteArray, userDataJson : JsonObject) {
         readyMessage = message.array()
     }
 
-    fun send(hostIp : InetAddress, hostPort : Int) : Job {
-        return GlobalScope.launch {//TODO("check it")
-            val toHostConn = Socket(hostIp, hostPort)
-            toHostConn.getOutputStream().write(readyMessage)
-            toHostConn.close()
+    fun send(pcNetworkInfo: PcNetworkInfo) : Job {
+        return GlobalScope.launch {
+            //TODO("check it")
+            if (pcNetworkInfo.commMode == PcNetworkInfo.CommMode.Wifi) {
+                // TCP
+                val toHostConn = Socket(pcNetworkInfo.hostTcpAddress, pcNetworkInfo.hostTcpPort)
+                toHostConn.outputStream.write(readyMessage)
+                toHostConn.close()
+            } else {
+                // BT
+                val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter() ?: return@launch
+                if (!bluetoothAdapter.isEnabled) {
+                    return@launch // TODO
+                }
+                val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter.bondedDevices
+                pairedDevices?.forEach { device ->
+                    val deviceName = device.name
+                    val deviceHardwareAddress = device.address // MAC address
+
+                    if (deviceHardwareAddress == pcNetworkInfo.hostBtMacAddress) {
+                        val connUUID = UUID.fromString(pcNetworkInfo.hostBtUuid)
+                        val socket = device.createInsecureRfcommSocketToServiceRecord(connUUID)
+                        socket.connect()
+                        socket.outputStream.write(readyMessage)
+                        socket.close()
+                    }
+                }
+                // TODO: pairing
+            }
         }
     }
 }

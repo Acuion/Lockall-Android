@@ -25,8 +25,8 @@ import java.nio.charset.Charset
 // JSON user data...
 
 // Unencrypted body BT:
-// host's bluetooth mac 8 bytes
-// host's server GUID 16 bytes
+// host's bluetooth mac 17 bytes string
+// host's server GUID 36 bytes string
 // JSON user data...
 
 class QrMessage(base64Data: String, fcstorage : FirstComponentsStorage) {
@@ -34,29 +34,25 @@ class QrMessage(base64Data: String, fcstorage : FirstComponentsStorage) {
     val secondComponent : ByteArray
     var userDataJson : JsonObject = JsonObject()
 
-    var commMode = CommMode.Wifi
-
-    var hostTcpAddress : InetAddress? = null
-    var hostTcpPort : Int = 0
-
-    var hostBtMacAddress : ByteArray? = null
-    var hostBtUuid : ByteArray? = null
+    var pcNetworkInfo = PcNetworkInfo()
 
     private fun tryToDecrypt(encryptedBody : ByteArray, key : ByteArray, iv : ByteArray) : Boolean {
         return try {
             val userBytes = ByteBuffer.wrap(EncryptionUtils.decryptDataWithAes256(encryptedBody, key, iv))
             userBytes.order(ByteOrder.LITTLE_ENDIAN)
-            commMode = if (userBytes.get() == 1.toByte()) CommMode.Wifi else CommMode.Bluetooth
-            if (commMode == CommMode.Wifi) {
+            pcNetworkInfo.commMode = if (userBytes.get() == 1.toByte()) PcNetworkInfo.CommMode.Wifi else PcNetworkInfo.CommMode.Bluetooth
+            if (pcNetworkInfo.commMode == PcNetworkInfo.CommMode.Wifi) {
                 val hostIpBytes = ByteArray(4)
                 userBytes.get(hostIpBytes)
-                hostTcpAddress = InetAddress.getByAddress(hostIpBytes)
-                hostTcpPort = userBytes.getInt()
+                pcNetworkInfo.hostTcpAddress = InetAddress.getByAddress(hostIpBytes)
+                pcNetworkInfo.hostTcpPort = userBytes.getInt()
             } else {
-                hostBtMacAddress = ByteArray(8)
-                hostBtUuid = ByteArray(16)
-                userBytes.get(hostBtMacAddress)
-                userBytes.get(hostBtUuid)
+                val hostBtMacAddressBytes = ByteArray(17)
+                val hostBtUuidBytes = ByteArray(36)
+                userBytes.get(hostBtMacAddressBytes)
+                userBytes.get(hostBtUuidBytes)
+                pcNetworkInfo.hostBtMacAddress = String(hostBtMacAddressBytes, Charset.forName("UTF-8"))
+                pcNetworkInfo.hostBtUuid = String(hostBtUuidBytes, Charset.forName("UTF-8"))
             }
 
             val userDataRaw = ByteArray(userBytes.remaining())
@@ -95,10 +91,5 @@ class QrMessage(base64Data: String, fcstorage : FirstComponentsStorage) {
                 }
             }
         }
-    }
-
-    enum class CommMode {
-        Wifi,
-        Bluetooth
     }
 }
