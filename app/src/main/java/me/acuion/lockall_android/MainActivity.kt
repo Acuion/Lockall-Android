@@ -21,7 +21,6 @@ import me.acuion.lockall_android.storages.PasswordsStorage
 import org.apache.commons.codec.binary.Base32
 import java.nio.ByteBuffer
 import kotlin.experimental.and
-import kotlin.experimental.or
 
 
 class MainActivity : Activity() {
@@ -89,7 +88,7 @@ class MainActivity : Activity() {
                                             qrData.secondComponent)
                                     val message = NetworkMessage(key,
                                             gson.toJsonTree(MessageWithName(qrContent.name)).asJsonObject)
-                                    message.send(qrData.hostAddress!!, qrData.hostPort)
+                                    message.send(qrData.hostTcpAddress!!, qrData.hostTcpPort)
                                 }
                                 QrType.STORE.prefix -> {
                                     // store
@@ -121,7 +120,7 @@ class MainActivity : Activity() {
                                                 qrData.secondComponent)
                                         val message = NetworkMessage(key,
                                                 gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
-                                        message.send(qrData.hostAddress!!, qrData.hostPort)
+                                        message.send(qrData.hostTcpAddress!!, qrData.hostTcpPort)
                                     }
                                 }
                                 QrType.PULL.prefix -> {
@@ -149,7 +148,7 @@ class MainActivity : Activity() {
                                         val pass = storage.getPass(usedResourceid, it)!!
                                         val message = NetworkMessage(key,
                                                 gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
-                                        message.send(qrData.hostAddress!!, qrData.hostPort)
+                                        message.send(qrData.hostTcpAddress!!, qrData.hostTcpPort)
                                     }
                                 }
                                 QrType.OTP.prefix -> {
@@ -189,7 +188,7 @@ class MainActivity : Activity() {
                                                 qrData.secondComponent)
                                         val message = NetworkMessage(key,
                                                 gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
-                                        message.send(qrData.hostAddress!!, qrData.hostPort)
+                                        message.send(qrData.hostTcpAddress!!, qrData.hostTcpPort)
                                     }
                                 }
                                 else -> {

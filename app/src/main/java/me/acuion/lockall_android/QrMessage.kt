@@ -19,29 +19,48 @@ import java.nio.charset.Charset
 // the encrypted body length
 // the encrypted body itself
 
-// Unencrypted body:
+// Unencrypted body TCP:
 // host's ip 4 bytes
 // host's port 4 bytes
+// JSON user data...
+
+// Unencrypted body BT:
+// host's bluetooth mac 8 bytes
+// host's server GUID 16 bytes
 // JSON user data...
 
 class QrMessage(base64Data: String, fcstorage : FirstComponentsStorage) {
     var firstComponent : ByteArray? = null
     val secondComponent : ByteArray
-    var hostAddress : InetAddress? = null
-    var hostPort : Int = 0
     var userDataJson : JsonObject = JsonObject()
+
+    var commMode = CommMode.Wifi
+
+    var hostTcpAddress : InetAddress? = null
+    var hostTcpPort : Int = 0
+
+    var hostBtMacAddress : ByteArray? = null
+    var hostBtUuid : ByteArray? = null
 
     private fun tryToDecrypt(encryptedBody : ByteArray, key : ByteArray, iv : ByteArray) : Boolean {
         return try {
             val userBytes = ByteBuffer.wrap(EncryptionUtils.decryptDataWithAes256(encryptedBody, key, iv))
             userBytes.order(ByteOrder.LITTLE_ENDIAN)
-            val hostIpBytes = ByteArray(4)
-            userBytes.get(hostIpBytes)
-            hostAddress = InetAddress.getByAddress(hostIpBytes)
-            hostPort = userBytes.getInt()
+            commMode = if (userBytes.get() == 1.toByte()) CommMode.Wifi else CommMode.Bluetooth
+            if (commMode == CommMode.Wifi) {
+                val hostIpBytes = ByteArray(4)
+                userBytes.get(hostIpBytes)
+                hostTcpAddress = InetAddress.getByAddress(hostIpBytes)
+                hostTcpPort = userBytes.getInt()
+            } else {
+                hostBtMacAddress = ByteArray(8)
+                hostBtUuid = ByteArray(16)
+                userBytes.get(hostBtMacAddress)
+                userBytes.get(hostBtUuid)
+            }
+
             val userDataRaw = ByteArray(userBytes.remaining())
             userBytes.get(userDataRaw)
-
             userDataJson = JsonParser().parse(String(userDataRaw, Charset.forName("UTF-8"))).asJsonObject
             true
         } catch (ex : Exception) {
@@ -76,5 +95,10 @@ class QrMessage(base64Data: String, fcstorage : FirstComponentsStorage) {
                 }
             }
         }
+    }
+
+    enum class CommMode {
+        Wifi,
+        Bluetooth
     }
 }
