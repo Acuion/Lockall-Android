@@ -2,21 +2,23 @@ package me.acuion.lockall_android.crypto
 
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
-import java.security.MessageDigest
-import java.security.SecureRandom
+import java.security.*
 import javax.crypto.Cipher
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
+data class EcdhCompletionResult(val key: ByteArray, val mobilePublic: ByteArray)
+
 class EncryptionUtils {
     companion object
     {
-        fun produce256BitsFromComponents(comp1: ByteArray, comp2: ByteArray): ByteArray {
-            val merged = ByteBuffer.allocate(comp1.size + comp2.size)
-            merged.put(comp1)
-            merged.put(comp2)
-            return MessageDigest.getInstance("SHA-256").digest(merged.array())
+        fun completeEcdhGetKeyAndPublic(pcPublic: ByteArray): EcdhCompletionResult {
+            val kpg = KeyPairGenerator.getInstance("EC")
+            kpg.initialize(521)
+            val kp = kpg.generateKeyPair()
+
+            val pk = PublicKey()
         }
 
         fun generate128bitIv() : ByteArray {

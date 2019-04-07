@@ -21,7 +21,6 @@ class ScanQrActivity : Activity() {
     lateinit var qrDetecor : BarcodeDetector
     lateinit var cameraSource: CameraSource
 
-    var needConfirmation = false
     val resultIntent = Intent()
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>?, grantResults: IntArray?) {
@@ -45,14 +44,12 @@ class ScanQrActivity : Activity() {
         if (p0!!.detectedItems.size() == 0) {
             txtresult.post {
                 txtresult.text = getString(R.string.scan_qr)
-                needConfirmation = false
             }
             return
         }
         if (!p0.detectedItems.valueAt(0).displayValue.startsWith("LOCKALL:")) {
             txtresult.post {
                 txtresult.text = getString(R.string.not_lockall_qr)
-                needConfirmation = false
             }
             return
         }
@@ -70,37 +67,26 @@ class ScanQrActivity : Activity() {
         }
         resultIntent.putExtra("prefix", prefix)
         resultIntent.putExtra("data", base64Data)
-        if (prefix == QrType.PAIRING.prefix) {
-            txtresult.post {
-                txtresult.text = getString(R.string.pair_qr)
-                needConfirmation = true
-            }
-        } else {
-            setResult(RESULT_OK, resultIntent)
-            finish()
-        }
+        setResult(RESULT_OK, resultIntent)
+        finish()
     }
 
     fun otpQrDetectionsHander(p0: Detector.Detections<Barcode>?) {
         if (p0!!.detectedItems.size() == 0) {
             txtresult.post {
                 txtresult.text = getString(R.string.scan_qr)
-                needConfirmation = false
             }
             return
         }
         if (!p0.detectedItems.valueAt(0).displayValue.startsWith("otpauth://totp/")) {
             txtresult.post {
                 txtresult.text = getString(R.string.not_otp_qr)
-                needConfirmation = false
             }
             return
         }
         resultIntent.putExtra("data", p0.detectedItems.valueAt(0).displayValue)
-        txtresult.post {
-            txtresult.text = getString(R.string.otp_qr)
-            needConfirmation = true
-        }
+        setResult(RESULT_OK, resultIntent)
+        finish()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -150,12 +136,5 @@ class ScanQrActivity : Activity() {
             }
 
         })
-
-        cameraPreview.setOnClickListener {
-            if (!needConfirmation)
-                return@setOnClickListener
-            setResult(RESULT_OK, resultIntent)
-            finish()
-        }
     }
 }

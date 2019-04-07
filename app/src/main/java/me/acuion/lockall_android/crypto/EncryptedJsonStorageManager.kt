@@ -23,7 +23,6 @@ import javax.crypto.spec.GCMParameterSpec
 
 class EncryptedJsonStorageManager(val context : Context, val encfile : Filename) {
     enum class Filename(val fname : String) {
-        FirstComponentsStorage("firstComponentsStorage"),
         PasswordsStorage("passwordsStorage"),
         OtpsStorage("otpsStorage")
     }
