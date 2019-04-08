@@ -11,6 +11,7 @@ import me.acuion.lockall_android.crypto.EncryptionUtils
 import android.app.KeyguardManager
 import android.content.Context
 import android.net.Uri
+import me.acuion.lockall_android.crypto.EncryptionUtils.Companion.completeEcdhGetKeyAndPublic
 import me.acuion.lockall_android.messages.MessageStatus
 import me.acuion.lockall_android.messages.Password.MessageWithPassword
 import me.acuion.lockall_android.messages.Password.MessageWithResourceid
@@ -34,13 +35,6 @@ class MainActivity : Activity() {
 
     lateinit var systemwideAuthSuccessCallback : () -> Unit
     lateinit var systemwideProfileSelectSuccessCallback : (selectedProfile : String) -> Unit
-
-    private fun getPasswordsStorage(): PasswordsStorage? {
-        val gson = Gson()
-        val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
-        val pjo = ejsm.data ?: return null
-        return gson.fromJson(pjo, PasswordsStorage::class.java)
-    }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (resultCode == RESULT_CANCELED) {
@@ -72,7 +66,10 @@ class MainActivity : Activity() {
 
                                     val usedResourceid = qrOverrideResourceid ?: qrContent.resourceid
 
-                                    val storage = getPasswordsStorage()
+                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
+                                    val pjo = ejsm.data
+                                    val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
+
                                     if (storage == null) {
                                         Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
                                         return@authUser
@@ -90,9 +87,8 @@ class MainActivity : Activity() {
                                             Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
                                             return@selectProfile
                                         }
-                                        val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                                qrData.pcEcdhPublicBytes)
-                                        val message = NetworkMessage(key,
+                                        val keysStructure = completeEcdhGetKeyAndPublic(qrData.pcEcdhPublicPemKey)
+                                        val message = NetworkMessage(keysStructure,
                                                 gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
                                         message.send(qrData.pcNetworkInfo)
                                     }
@@ -103,23 +99,26 @@ class MainActivity : Activity() {
 
                                     val usedResourceid = qrOverrideResourceid ?: qrContent.resourceid
 
-                                    val storage = getPasswordsStorage()
+                                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
+                                    val pjo = ejsm.data
+                                    val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
+
                                     if (storage == null) {
                                         Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
                                         return@authUser
                                     }
 
-                                    val currentProfiles = storage.getProfilesForResource(usedResourceid)
+                                    val currentProfiles = arrayOf("Dummy profile")//todo: storage.getProfilesForResource(usedResourceid)
                                     if (currentProfiles == null) {
                                         Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
                                         return@authUser
                                     }
                                     selectProfile(usedResourceid, currentProfiles,
                                             false) {
-                                        val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                                qrData.pcEcdhPublicBytes)
-                                        val pass = storage.getPass(usedResourceid, it)!!
-                                        val message = NetworkMessage(key,
+
+                                        val keysStructure = completeEcdhGetKeyAndPublic(qrData.pcEcdhPublicPemKey)
+                                        val pass = "OMG IT WORKS" //todo: storage.getPass(usedResourceid, it)!!
+                                        val message = NetworkMessage(keysStructure,
                                                 gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
                                         message.send(qrData.pcNetworkInfo)
                                     }
@@ -157,9 +156,8 @@ class MainActivity : Activity() {
                                         val result = res1.or(res2).or(res3).or(res4)
                                         val pass = (result.rem(1000000)).toString().padStart(6, '0')
 
-                                        val key = EncryptionUtils.produce256BitsFromComponents(qrData.firstComponent!!,
-                                                qrData.pcEcdhPublicBytes)
-                                        val message = NetworkMessage(key,
+                                        val keysStructure = completeEcdhGetKeyAndPublic(qrData.pcEcdhPublicPemKey)
+                                        val message = NetworkMessage(keysStructure,
                                                 gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
                                         message.send(qrData.pcNetworkInfo)
                                     }

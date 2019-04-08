@@ -15,21 +15,22 @@ import android.bluetooth.BluetoothDevice
 import android.widget.Toast
 import android.support.v4.app.ActivityCompat.startActivityForResult
 import android.content.Intent
+import me.acuion.lockall_android.crypto.EcdhCompletionResult
 import java.util.*
 
 
-class NetworkMessage(key : ByteArray, userDataJson : JsonObject) {
-    val REQUEST_ENABLE_BT = 1
-
+class NetworkMessage(keyStructure : EcdhCompletionResult, userDataJson : JsonObject) {
     val readyMessage : ByteArray
 
     init {
         val iv = EncryptionUtils.generate128bitIv()
         val encryptedUserData = EncryptionUtils.encryptDataWithAes256(
-                userDataJson.toString().toByteArray(Charset.forName("UTF-8")), key, iv)
+                userDataJson.toString().toByteArray(Charset.forName("UTF-8")), keyStructure.key, iv)
 
-        val message  = ByteBuffer.allocate(4 + iv.size + encryptedUserData.size)
+        val message  = ByteBuffer.allocate(4 + keyStructure.mobilePublic.size + 4 + iv.size + encryptedUserData.size)
         message.order(ByteOrder.LITTLE_ENDIAN)
+        message.putInt(keyStructure.mobilePublic.size)
+        message.put(keyStructure.mobilePublic)
         message.put(iv)
         message.putInt(encryptedUserData.size)
         message.put(encryptedUserData)

@@ -29,7 +29,7 @@ import java.nio.charset.Charset
 // JSON user data...
 
 class QrMessage(base64Data: String) {
-    val pcEcdhPublicBytes : ByteArray
+    val pcEcdhPublicPemKey : ByteArray
     var userDataJson : JsonObject = JsonObject()
 
     var pcNetworkInfo = PcNetworkInfo()
@@ -38,8 +38,9 @@ class QrMessage(base64Data: String) {
         val qrBytes = ByteBuffer.wrap(Base64.decode(base64Data, 0))
         qrBytes.order(ByteOrder.LITTLE_ENDIAN)
         val pcEcdhPublicLen = qrBytes.getInt()
-        pcEcdhPublicBytes = ByteArray(pcEcdhPublicLen)
-        qrBytes.get(pcEcdhPublicBytes)
+        pcEcdhPublicPemKey = ByteArray(pcEcdhPublicLen)
+        qrBytes.get(pcEcdhPublicPemKey)
+
         val userDataLength = qrBytes.getInt()
         val userDataBytes = ByteArray(userDataLength)
         qrBytes.get(userDataBytes)

@@ -1,9 +1,9 @@
 package me.acuion.lockall_android.crypto
 
-import java.nio.ByteBuffer
-import java.nio.charset.Charset
 import java.security.*
+import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
+import javax.crypto.KeyAgreement
 import javax.crypto.Mac
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
@@ -15,10 +15,21 @@ class EncryptionUtils {
     {
         fun completeEcdhGetKeyAndPublic(pcPublic: ByteArray): EcdhCompletionResult {
             val kpg = KeyPairGenerator.getInstance("EC")
-            kpg.initialize(521)
+            kpg.initialize(384)
             val kp = kpg.generateKeyPair()
 
-            val pk = PublicKey()
+            val kf = KeyFactory.getInstance("EC")
+            val pkSpec = X509EncodedKeySpec(pcPublic)
+            val otherPublicKey = kf.generatePublic(pkSpec)
+
+            val ka = KeyAgreement.getInstance("ECDH")
+            ka.init(kp.private)
+            ka.doPhase(otherPublicKey, true)
+
+            val hash = MessageDigest.getInstance("SHA-256")
+            hash.update(ka.generateSecret())
+
+            return EcdhCompletionResult(hash.digest(), kp.public.encoded)
         }
 
         fun generate128bitIv() : ByteArray {
