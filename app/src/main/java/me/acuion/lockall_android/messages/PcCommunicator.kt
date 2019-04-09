@@ -2,9 +2,7 @@ package me.acuion.lockall_android.messages
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import me.acuion.lockall_android.NetworkMessage
 import me.acuion.lockall_android.PcNetworkInfo
 import me.acuion.lockall_android.crypto.EncryptionUtils
@@ -21,45 +19,41 @@ class PcCommunicator(val pcNetworkInfo: PcNetworkInfo) {
     private lateinit var outputStream: OutputStream
     private lateinit var intputStream: InputStream
 
-    fun connect() : Job {
-        return GlobalScope.launch {
-            if (pcNetworkInfo.commMode == PcNetworkInfo.CommMode.Wifi) {
-                // TCP
-                val toHostConn = Socket(pcNetworkInfo.hostTcpAddress, pcNetworkInfo.hostTcpPort)
-                outputStream = toHostConn.outputStream
-                intputStream = toHostConn.inputStream
-            } else {
-                // BT
-                val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter() ?: return@launch
-                if (!bluetoothAdapter.isEnabled) {
-                    return@launch // TODO
-                }
-                val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter.bondedDevices
-                pairedDevices?.forEach { device ->
-                    val deviceName = device.name
-                    val deviceHardwareAddress = device.address // MAC address
-
-                    if (deviceHardwareAddress == pcNetworkInfo.hostBtMacAddress) {
-                        val connUUID = UUID.fromString(pcNetworkInfo.hostBtUuid)
-                        val socket = device.createInsecureRfcommSocketToServiceRecord(connUUID)
-                        socket.connect()
-                        outputStream = socket.outputStream
-                        intputStream = socket.inputStream
-                    }
-                }
-                // TODO: pairing
+    fun connect() {
+        if (pcNetworkInfo.commMode == PcNetworkInfo.CommMode.Wifi) {
+            // TCP
+            val toHostConn = Socket(pcNetworkInfo.hostTcpAddress, pcNetworkInfo.hostTcpPort)
+            outputStream = toHostConn.outputStream
+            intputStream = toHostConn.inputStream
+        } else {
+            // BT
+            val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter() ?: return
+            if (!bluetoothAdapter.isEnabled) {
+                return // TODO
             }
+            val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter.bondedDevices
+            pairedDevices?.forEach { device ->
+                val deviceName = device.name
+                val deviceHardwareAddress = device.address // MAC address
+
+                if (deviceHardwareAddress == pcNetworkInfo.hostBtMacAddress) {
+                    val connUUID = UUID.fromString(pcNetworkInfo.hostBtUuid)
+                    val socket = device.createInsecureRfcommSocketToServiceRecord(connUUID)
+                    socket.connect()
+                    outputStream = socket.outputStream
+                    intputStream = socket.inputStream
+                }
+            }
+            // TODO: pairing
         }
     }
 
-    fun send(message: NetworkMessage)
-    {
+    fun send(message: NetworkMessage) {
         outputStream.write(message.readyMessage)
     }
 
-    fun readEncrypted(aes256Key: ByteArray) : ByteArray
-    {
-        val dis = InputStreamReader(intputStream)
+    fun readEncrypted(aes256Key: ByteArray) : ByteArray {
+        val dis = DataInputStream(intputStream)
 
         val iv = ByteArray(16)
         dis.readFully(iv)

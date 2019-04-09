@@ -12,6 +12,8 @@ import android.app.KeyguardManager
 import android.content.Context
 import android.net.Uri
 import com.google.gson.JsonParser
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import me.acuion.lockall_android.crypto.EncryptionUtils.Companion.completeEcdhGetKeyAndPublic
 import me.acuion.lockall_android.messages.MessageStatus
 import me.acuion.lockall_android.messages.Password.MessageWithPassword
@@ -39,182 +41,196 @@ class MainActivity : Activity() {
     lateinit var systemwideAuthSuccessCallback : () -> Unit
     lateinit var systemwideProfileSelectSuccessCallback : (selectedProfile : String) -> Unit
 
+    private fun issueToast(text: String) = runOnUiThread {
+        Toast.makeText(applicationContext, text, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun processLockallQr(qrData: String, prefix: String, overrideResourceId: String?) = GlobalScope.launch {
+        val gson = Gson()
+        val qrData = QrMessage(qrData)
+        val pcComm = PcCommunicator(qrData.pcNetworkInfo)
+        pcComm.connect()
+        val keyStructure = completeEcdhGetKeyAndPublic(qrData.pcEcdhPublicPemKey)
+        pcComm.send(NetworkMessage(keyStructure))
+        val userDataJson = JsonParser().parse(String(pcComm.readEncrypted(keyStructure.key),
+                Charset.forName("UTF-8"))).asJsonObject
+
+        when (prefix) {
+            QrType.STORE.prefix -> {
+                // store
+                val qrContent = gson.fromJson(userDataJson, MessageWithPassword::class.java)!!
+
+                val usedResourceid = overrideResourceId
+                        ?: qrContent.resourceid
+
+                val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
+                val pjo = ejsm.data
+                val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
+
+                if (storage == null) {
+                    issueToast("Failed to read the storage")
+                    return@launch
+                }
+                var currentProfiles = storage.getProfilesForResource(usedResourceid)
+                if (currentProfiles == null)
+                    currentProfiles = Array(0) { _ -> "" }
+                selectProfile(usedResourceid, currentProfiles,
+                        true) {
+                    storage.put(usedResourceid, it, qrContent.password)
+                    try {
+                        ejsm.data = gson.toJsonTree(storage).asJsonObject
+                    } catch (ex: Exception) {
+                        ex.printStackTrace()
+                        issueToast("Failed to save updated storage")
+                        return@selectProfile
+                    }
+
+                    val message = NetworkMessage(keyStructure.key,
+                            gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
+                    pcComm.send(message)
+                }
+            }
+            QrType.PULL.prefix -> {
+                // pull password
+                val qrContent = gson.fromJson(userDataJson, MessageWithResourceid::class.java)!!
+
+                val usedResourceid = overrideResourceId
+                        ?: qrContent.resourceid
+
+                val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
+                val pjo = ejsm.data
+                val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
+
+                if (storage == null) {
+                    issueToast("Failed to read the storage")
+                    return@launch
+                }
+
+                val currentProfiles = storage.getProfilesForResource(usedResourceid)
+                if (currentProfiles == null) {
+                    issueToast("Nothing to send")
+                    return@launch
+                }
+                selectProfile(usedResourceid, currentProfiles,
+                        false) {
+
+                    val pass = storage.getPass(usedResourceid, it)!!
+                    val message = NetworkMessage(keyStructure.key,
+                            gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
+                    pcComm.send(message)
+                }
+            }
+            QrType.OTP.prefix -> {
+                // pull otp
+
+                val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.OtpsStorage)
+                val pjo = ejsm.data
+                if (pjo == null) {
+                    issueToast("Failed to read the storage")
+                    return@launch
+                }
+                val storage = gson.fromJson(pjo, OtpDataStorage::class.java)
+                val currentProfiles = storage.getIssuerProfileKeys()
+                if (currentProfiles.isEmpty()) {
+                    issueToast("Nothing to send")
+                    return@launch
+                }
+                // TODO("resource name")
+                selectProfile("OTP", currentProfiles,
+                        false) {
+                    val secret = storage.getSecretFrom(it)
+                    val currTime = (System.currentTimeMillis() / 1000) / 30 // 30 sec period
+
+                    val secretBytes = Base32().decode(secret)
+                    val timeBytes = ByteBuffer.allocate(8)
+                    timeBytes.putLong(currTime)
+                    val hmacBytes = EncryptionUtils.hmacSha1(timeBytes.array(), secretBytes)
+                    val offset = (hmacBytes.last() and 0x0F).toInt()
+                    val res1 = (hmacBytes[offset]).toInt().and(0x7F).shl(24)
+                    val res2 = (hmacBytes[offset + 1]).toInt().and(0xFF).shl(16)
+                    val res3 = (hmacBytes[offset + 2]).toInt().and(0xFF).shl(8)
+                    val res4 = (hmacBytes[offset + 3]).toInt().and(0xFF)
+                    val result = res1.or(res2).or(res3).or(res4)
+                    val pass = (result.rem(1000000)).toString().padStart(6, '0')
+
+                    val message = NetworkMessage(keyStructure.key,
+                            gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
+                    pcComm.send(message)
+                }
+            }
+            else -> {
+                issueToast("Unrecognized QR type")
+            }
+        }
+    }
+
+    private fun processOtpQr(qrData: String) = GlobalScope.launch {
+        val gson = Gson()
+        lateinit var secret : String
+        lateinit var account : String
+        lateinit var issuer : String
+        try {
+            val totpUri = Uri.parse(qrData)
+            secret = totpUri.getQueryParameter("secret")!!
+            val path = totpUri.path.substring(1)
+            issuer = totpUri.getQueryParameter("issuer")
+            if (path.contains(':')) {
+                if (issuer == null)
+                    issuer = path.split(':')[0]
+                account = path.split(':')[1]
+            } else {
+                if (issuer == null)
+                    issuer = "unknown"
+                account = path
+            }
+        } catch (ex : Exception) {
+            issueToast("Error parsing OTP QR")
+            return@launch
+        }
+        val otpEjsm = EncryptedJsonStorageManager(applicationContext,
+                EncryptedJsonStorageManager.Filename.OtpsStorage)
+        val otpsStorageJson = otpEjsm.data
+        if (otpsStorageJson == null) {
+            issueToast("Cannot load OTPs storage")
+            return@launch
+        }
+        val otpsStorage = gson.fromJson(otpsStorageJson, OtpDataStorage::class.java)
+        otpsStorage.put(issuer, account, secret)
+
+        try {
+            otpEjsm.data = gson.toJsonTree(otpsStorage).asJsonObject
+        } catch (ex: Exception) {
+            issueToast("Failed to save updated storage")
+            return@launch
+        }
+
+        issueToast("OTP generator stored for $account from $issuer")
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (resultCode == RESULT_CANCELED) {
             return
         }
 
         when (requestCode) {
-            RequestCodeEnum.UserAuth.code -> {
+            RequestCodeEnum.UserAuth.code -> GlobalScope.launch {
                 systemwideAuthSuccessCallback()
             }
 
-            RequestCodeEnum.ProfileSelect.code -> {
+            RequestCodeEnum.ProfileSelect.code -> GlobalScope.launch {
                 systemwideProfileSelectSuccessCallback(data!!.getStringExtra("profile")!!)
             }
 
             RequestCodeEnum.ScanQr.code -> {
-                val gson = Gson()
                 authUser {
                     when (data!!.getStringExtra("mode")!!) {
                         ScanQrActivity.QrScanMode.LOCKALL.mode -> {
-                            val qrData = QrMessage(data.getStringExtra("data")!!)
-                            val pcComm = PcCommunicator(qrData.pcNetworkInfo)
-                            pcComm.connect().invokeOnCompletion {
-                                val keyStructure = completeEcdhGetKeyAndPublic(qrData.pcEcdhPublicPemKey)
-                                pcComm.send(NetworkMessage(keyStructure))
-                                val userDataJson = JsonParser().parse(String(pcComm.readEncrypted(keyStructure.key),
-                                        Charset.forName("UTF-8"))).asJsonObject
-                                val qrPrefix = data.getStringExtra("prefix")!!
-                                val qrOverrideResourceid = data.getStringExtra("overrideResourceid")
-
-                                when (qrPrefix) {
-                                    QrType.STORE.prefix -> {
-                                        // store
-                                        val qrContent = gson.fromJson(userDataJson, MessageWithPassword::class.java)!!
-
-                                        val usedResourceid = qrOverrideResourceid ?: qrContent.resourceid
-
-                                        val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
-                                        val pjo = ejsm.data
-                                        val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
-
-                                        if (storage == null) {
-                                            Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
-                                            return@invokeOnCompletion
-                                        }
-                                        var currentProfiles = storage.getProfilesForResource(usedResourceid)
-                                        if (currentProfiles == null)
-                                            currentProfiles = Array(0) { _ -> "" }
-                                        selectProfile(usedResourceid, currentProfiles,
-                                                true) {
-                                            storage.put(usedResourceid, it, qrContent.password)
-                                            try {
-                                                ejsm.data = gson.toJsonTree(storage).asJsonObject
-                                            } catch (ex: Exception) {
-                                                ex.printStackTrace()
-                                                Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
-                                                return@selectProfile
-                                            }
-
-                                            val message = NetworkMessage(keyStructure.key,
-                                                    gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
-                                            pcComm.send(message)
-                                        }
-                                    }
-                                    QrType.PULL.prefix -> {
-                                        // pull password
-                                        val qrContent = gson.fromJson(userDataJson, MessageWithResourceid::class.java)!!
-
-                                        val usedResourceid = qrOverrideResourceid ?: qrContent.resourceid
-
-                                        val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
-                                        val pjo = ejsm.data
-                                        val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
-
-                                        if (storage == null) {
-                                            Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
-                                            return@invokeOnCompletion
-                                        }
-
-                                        val currentProfiles = storage.getProfilesForResource(usedResourceid)
-                                        if (currentProfiles == null) {
-                                            Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
-                                            return@invokeOnCompletion
-                                        }
-                                        selectProfile(usedResourceid, currentProfiles,
-                                                false) {
-
-                                            val pass = storage.getPass(usedResourceid, it)!!
-                                            val message = NetworkMessage(keyStructure.key,
-                                                    gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
-                                            pcComm.send(message)
-                                        }
-                                    }
-                                    QrType.OTP.prefix -> {
-                                        // pull otp
-
-                                        val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.OtpsStorage)
-                                        val pjo = ejsm.data
-                                        if (pjo == null) {
-                                            Toast.makeText(applicationContext, "Failed to read the storage", Toast.LENGTH_SHORT).show()
-                                            return@invokeOnCompletion
-                                        }
-                                        val storage = gson.fromJson(pjo, OtpDataStorage::class.java)
-                                        val currentProfiles = storage.getIssuerProfileKeys()
-                                        if (currentProfiles.isEmpty()) {
-                                            Toast.makeText(applicationContext, "Nothing to send", Toast.LENGTH_SHORT).show()
-                                            return@invokeOnCompletion
-                                        }
-                                        // TODO("resource name")
-                                        selectProfile("OTP", currentProfiles,
-                                                false) {
-                                            val secret = storage.getSecretFrom(it)
-                                            val currTime = (System.currentTimeMillis() / 1000) / 30 // 30 sec period
-
-                                            val secretBytes = Base32().decode(secret)
-                                            val timeBytes = ByteBuffer.allocate(8)
-                                            timeBytes.putLong(currTime)
-                                            val hmacBytes = EncryptionUtils.hmacSha1(timeBytes.array(), secretBytes)
-                                            val offset = (hmacBytes.last() and 0x0F).toInt()
-                                            val res1 = (hmacBytes[offset]).toInt().and(0x7F).shl(24)
-                                            val res2 = (hmacBytes[offset + 1]).toInt().and(0xFF).shl(16)
-                                            val res3 = (hmacBytes[offset + 2]).toInt().and(0xFF).shl(8)
-                                            val res4 = (hmacBytes[offset + 3] ).toInt().and(0xFF)
-                                            val result = res1.or(res2).or(res3).or(res4)
-                                            val pass = (result.rem(1000000)).toString().padStart(6, '0')
-
-                                            val message = NetworkMessage(keyStructure.key,
-                                                    gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
-                                            pcComm.send(message)
-                                        }
-                                    }
-                                    else -> {
-                                        Toast.makeText(applicationContext, "Unrecognized QR type", Toast.LENGTH_LONG).show()
-                                    }
-                                }
-                            }
+                            processLockallQr(data.getStringExtra("data")!!,
+                                    data.getStringExtra("prefix")!!,
+                                    data.getStringExtra("overrideResourceid"))
                         }
                         ScanQrActivity.QrScanMode.OTP.mode -> {
-                            lateinit var secret : String
-                            lateinit var account : String
-                            lateinit var issuer : String
-                            try {
-                                val totpUri = Uri.parse(data.getStringExtra("data")!!)
-                                secret = totpUri.getQueryParameter("secret")!!
-                                val path = totpUri.path.substring(1)
-                                issuer = totpUri.getQueryParameter("issuer")
-                                if (path.contains(':')) {
-                                    if (issuer == null)
-                                        issuer = path.split(':')[0]
-                                    account = path.split(':')[1]
-                                } else {
-                                    if (issuer == null)
-                                        issuer = "unknown"
-                                    account = path
-                                }
-                            } catch (ex : Exception) {
-                                Toast.makeText(applicationContext, "Error parsing OTP QR", Toast.LENGTH_SHORT).show()
-                                return@authUser
-                            }
-                            val otpEjsm = EncryptedJsonStorageManager(applicationContext,
-                                    EncryptedJsonStorageManager.Filename.OtpsStorage)
-                            val otpsStorageJson = otpEjsm.data
-                            if (otpsStorageJson == null) {
-                                Toast.makeText(applicationContext, "Cannot load OTPs storage", Toast.LENGTH_SHORT).show()
-                                return@authUser
-                            }
-                            val otpsStorage = gson.fromJson(otpsStorageJson, OtpDataStorage::class.java)
-                            otpsStorage.put(issuer, account, secret)
-
-                            try {
-                                otpEjsm.data = gson.toJsonTree(otpsStorage).asJsonObject
-                            } catch (ex: Exception) {
-                                Toast.makeText(applicationContext, "Failed to save updated storage", Toast.LENGTH_SHORT).show()
-                                return@authUser
-                            }
-
-                            Toast.makeText(applicationContext, "OTP generator stored for $account from $issuer", Toast.LENGTH_SHORT).show()
+                            processOtpQr(data.getStringExtra("data")!!)
                         }
                     }
                 }
