@@ -30,8 +30,6 @@ import java.nio.charset.Charset
 
 class QrMessage(base64Data: String) {
     val pcEcdhPublicPemKey : ByteArray
-    var userDataJson : JsonObject = JsonObject()
-
     var pcNetworkInfo = PcNetworkInfo()
 
     init {
@@ -61,9 +59,5 @@ class QrMessage(base64Data: String) {
             pcNetworkInfo.hostBtMacAddress = String(hostBtMacAddressBytes, Charset.forName("UTF-8"))
             pcNetworkInfo.hostBtUuid = String(hostBtUuidBytes, Charset.forName("UTF-8"))
         }
-
-        val userDataRaw = ByteArray(userBytes.remaining())
-        userBytes.get(userDataRaw)
-        userDataJson = JsonParser().parse(String(userDataRaw, Charset.forName("UTF-8"))).asJsonObject
     }
 }
