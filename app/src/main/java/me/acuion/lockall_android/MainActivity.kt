@@ -195,7 +195,7 @@ class MainActivity : Activity() {
             return@launch
         }
         val otpsStorage = gson.fromJson(otpsStorageJson, OtpDataStorage::class.java)
-        otpsStorage.put(issuer, account, secret)
+        otpsStorage.put(issuer, account, secret.toUpperCase())
 
         try {
             otpEjsm.data = gson.toJsonTree(otpsStorage).asJsonObject
