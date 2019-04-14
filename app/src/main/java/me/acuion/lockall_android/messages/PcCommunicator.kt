@@ -2,6 +2,7 @@ package me.acuion.lockall_android.messages
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.content.Context
 import kotlinx.coroutines.*
 import me.acuion.lockall_android.NetworkMessage
 import me.acuion.lockall_android.PcNetworkInfo
@@ -10,18 +11,25 @@ import java.io.DataInputStream
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
+import java.lang.Exception
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*
+import android.net.wifi.WifiManager
+
 
 class PcCommunicator(val pcNetworkInfo: PcNetworkInfo) {
     private lateinit var outputStream: OutputStream
     private lateinit var intputStream: InputStream
 
-    fun connect() {
+    fun connect(context: Context) {
         if (pcNetworkInfo.commMode == PcNetworkInfo.CommMode.Wifi) {
             // TCP
+            val wifi = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
+            if (!wifi.isWifiEnabled) {
+                throw Exception("Wifi is not enabled!")
+            }
             val toHostConn = Socket(pcNetworkInfo.hostTcpAddress, pcNetworkInfo.hostTcpPort)
             outputStream = toHostConn.outputStream
             intputStream = toHostConn.inputStream
@@ -29,7 +37,7 @@ class PcCommunicator(val pcNetworkInfo: PcNetworkInfo) {
             // BT
             val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter() ?: return
             if (!bluetoothAdapter.isEnabled) {
-                return // TODO
+                throw Exception("Bluetooth is not enabled!")
             }
             val pairedDevices: Set<BluetoothDevice>? = bluetoothAdapter.bondedDevices
             pairedDevices?.forEach { device ->

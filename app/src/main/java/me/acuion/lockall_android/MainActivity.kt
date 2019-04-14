@@ -11,6 +11,7 @@ import me.acuion.lockall_android.crypto.EncryptionUtils
 import android.app.KeyguardManager
 import android.content.Context
 import android.net.Uri
+import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -49,11 +50,34 @@ class MainActivity : Activity() {
         val gson = Gson()
         val qrData = QrMessage(qrData)
         val pcComm = PcCommunicator(qrData.pcNetworkInfo)
-        pcComm.connect()
+        try {
+            pcComm.connect(applicationContext)
+        } catch (ex: Exception) {
+            issueToast("Connection failed: ${ex.localizedMessage}")
+            return@launch
+        }
         val keyStructure = completeEcdhGetKeyAndPublic(qrData.pcEcdhPublicPemKey)
-        pcComm.send(NetworkMessage(keyStructure))
-        val userDataJson = JsonParser().parse(String(pcComm.readEncrypted(keyStructure.key),
-                Charset.forName("UTF-8"))).asJsonObject
+        try {
+            pcComm.send(NetworkMessage(keyStructure))
+        } catch (ex: Exception) {
+            issueToast("ECDH sent failed: ${ex.localizedMessage}")
+            return@launch
+        }
+        lateinit var decryptedPayload: String
+        try {
+            decryptedPayload = String(pcComm.readEncrypted(keyStructure.key),
+                    Charset.forName("UTF-8"))
+        } catch(ex: Exception) {
+            issueToast("Data recieve failed: ${ex.localizedMessage}")
+            return@launch
+        }
+        lateinit var userDataJson: JsonObject
+        try {
+            userDataJson = JsonParser().parse(decryptedPayload).asJsonObject
+        } catch(ex: Exception) {
+            issueToast("Message decode failed: ${ex.localizedMessage}")
+            return@launch
+        }
 
         when (prefix) {
             QrType.STORE.prefix -> {
@@ -87,7 +111,12 @@ class MainActivity : Activity() {
 
                     val message = NetworkMessage(keyStructure.key,
                             gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
-                    pcComm.send(message)
+                    try {
+                        pcComm.send(message)
+                    } catch (ex: Exception) {
+                        issueToast("Feedback failed: ${ex.localizedMessage}")
+                        return@selectProfile
+                    }
                 }
             }
             QrType.PULL.prefix -> {
@@ -117,7 +146,12 @@ class MainActivity : Activity() {
                     val pass = storage.getPass(usedResourceid, it)!!
                     val message = NetworkMessage(keyStructure.key,
                             gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
-                    pcComm.send(message)
+                    try {
+                        pcComm.send(message)
+                    } catch (ex: Exception) {
+                        issueToast("Feedback failed: ${ex.localizedMessage}")
+                        return@selectProfile
+                    }
                 }
             }
             QrType.OTP.prefix -> {
@@ -155,7 +189,12 @@ class MainActivity : Activity() {
 
                     val message = NetworkMessage(keyStructure.key,
                             gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
-                    pcComm.send(message)
+                    try {
+                        pcComm.send(message)
+                    } catch (ex: Exception) {
+                        issueToast("Feedback failed: ${ex.localizedMessage}")
+                        return@selectProfile
+                    }
                 }
             }
             else -> {
