@@ -314,6 +314,11 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        //
+        val intent = Intent(this, OnboardingActivity::class.java)
+        startActivity(intent)
+        //
+
         keyguardManager = applicationContext.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
 
         if (!keyguardManager.isDeviceSecure) {
