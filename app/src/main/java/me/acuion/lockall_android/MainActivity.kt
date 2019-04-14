@@ -61,6 +61,7 @@ class MainActivity : Activity() {
             pcComm.send(NetworkMessage(keyStructure))
         } catch (ex: Exception) {
             issueToast("ECDH sent failed: ${ex.localizedMessage}")
+            pcComm.close()
             return@launch
         }
         lateinit var decryptedPayload: String
@@ -69,6 +70,7 @@ class MainActivity : Activity() {
                     Charset.forName("UTF-8"))
         } catch(ex: Exception) {
             issueToast("Data recieve failed: ${ex.localizedMessage}")
+            pcComm.close()
             return@launch
         }
         lateinit var userDataJson: JsonObject
@@ -76,6 +78,7 @@ class MainActivity : Activity() {
             userDataJson = JsonParser().parse(decryptedPayload).asJsonObject
         } catch(ex: Exception) {
             issueToast("Message decode failed: ${ex.localizedMessage}")
+            pcComm.close()
             return@launch
         }
 
@@ -94,6 +97,7 @@ class MainActivity : Activity() {
 
                     if (storage == null) {
                         issueToast("Failed to read the storage")
+                        pcComm.close()
                         return@authUser
                     }
                     var currentProfiles = storage.getProfilesForResource(usedResourceid)
@@ -107,6 +111,7 @@ class MainActivity : Activity() {
                         } catch (ex: Exception) {
                             ex.printStackTrace()
                             issueToast("Failed to save updated storage")
+                            pcComm.close()
                             return@selectProfile
                         }
 
@@ -116,6 +121,7 @@ class MainActivity : Activity() {
                             pcComm.send(message)
                         } catch (ex: Exception) {
                             issueToast("Feedback failed: ${ex.localizedMessage}")
+                            pcComm.close()
                             return@selectProfile
                         }
                     }
@@ -133,12 +139,14 @@ class MainActivity : Activity() {
 
                     if (storage == null) {
                         issueToast("Failed to read the storage")
+                        pcComm.close()
                         return@authUser
                     }
 
                     val currentProfiles = storage.getProfilesForResource(usedResourceid)
                     if (currentProfiles == null) {
                         issueToast("Nothing to send")
+                        pcComm.close()
                         return@authUser
                     }
                     selectProfile(usedResourceid, currentProfiles,
@@ -151,6 +159,7 @@ class MainActivity : Activity() {
                             pcComm.send(message)
                         } catch (ex: Exception) {
                             issueToast("Feedback failed: ${ex.localizedMessage}")
+                            pcComm.close()
                             return@selectProfile
                         }
                     }
@@ -162,12 +171,14 @@ class MainActivity : Activity() {
                     val pjo = ejsm.data
                     if (pjo == null) {
                         issueToast("Failed to read the storage")
+                        pcComm.close()
                         return@authUser
                     }
                     val storage = gson.fromJson(pjo, OtpDataStorage::class.java)
                     val currentProfiles = storage.getIssuerProfileKeys()
                     if (currentProfiles.isEmpty()) {
                         issueToast("Nothing to send")
+                        pcComm.close()
                         return@authUser
                     }
                     // TODO("resource name")
@@ -194,12 +205,14 @@ class MainActivity : Activity() {
                             pcComm.send(message)
                         } catch (ex: Exception) {
                             issueToast("Feedback failed: ${ex.localizedMessage}")
+                            pcComm.close()
                             return@selectProfile
                         }
                     }
                 }
                 else -> {
                     issueToast("Unrecognized QR type")
+                    pcComm.close()
                 }
             }
         }
@@ -211,9 +224,9 @@ class MainActivity : Activity() {
         lateinit var account : String
         lateinit var issuer : String
         try {
-            val totpUri = Uri.parse(qrData)
+            val totpUri = Uri.parse(qrData)!!
             secret = totpUri.getQueryParameter("secret")!!
-            val path = totpUri.path.substring(1)
+            val path = totpUri.path!!.substring(1)
             issuer = totpUri.getQueryParameter("issuer")
             if (path.contains(':')) {
                 if (issuer == null)

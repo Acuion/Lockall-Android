@@ -85,7 +85,7 @@ class OnboardingActivity : Activity() {
                 return imageView
             }
 
-            override fun destroyItem(container: ViewGroup?, position: Int, `object`: Any?) {
+            override fun destroyItem(container: ViewGroup, position: Int, `object`: Any) {
                 (container as ViewPager).removeView(`object` as View)
             }
         }

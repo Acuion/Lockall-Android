@@ -2,14 +2,13 @@ package me.acuion.lockall_android.messages
 
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothSocket
 import android.content.Context
-import kotlinx.coroutines.*
 import me.acuion.lockall_android.NetworkMessage
 import me.acuion.lockall_android.PcNetworkInfo
 import me.acuion.lockall_android.crypto.EncryptionUtils
 import java.io.DataInputStream
 import java.io.InputStream
-import java.io.InputStreamReader
 import java.io.OutputStream
 import java.lang.Exception
 import java.net.Socket
@@ -21,7 +20,9 @@ import android.net.wifi.WifiManager
 
 class PcCommunicator(val pcNetworkInfo: PcNetworkInfo) {
     private lateinit var outputStream: OutputStream
-    private lateinit var intputStream: InputStream
+    private lateinit var inputStream: InputStream
+    private var tcpSocket: Socket? = null
+    private var btSocket: BluetoothSocket? = null
 
     fun connect(context: Context) {
         if (pcNetworkInfo.commMode == PcNetworkInfo.CommMode.Wifi) {
@@ -30,9 +31,9 @@ class PcCommunicator(val pcNetworkInfo: PcNetworkInfo) {
             if (!wifi.isWifiEnabled) {
                 throw Exception("Wifi is not enabled!")
             }
-            val toHostConn = Socket(pcNetworkInfo.hostTcpAddress, pcNetworkInfo.hostTcpPort)
-            outputStream = toHostConn.outputStream
-            intputStream = toHostConn.inputStream
+            tcpSocket = Socket(pcNetworkInfo.hostTcpAddress, pcNetworkInfo.hostTcpPort)
+            outputStream = tcpSocket!!.outputStream
+            inputStream = tcpSocket!!.inputStream
         } else {
             // BT
             val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter() ?: return
@@ -46,10 +47,10 @@ class PcCommunicator(val pcNetworkInfo: PcNetworkInfo) {
 
                 if (deviceHardwareAddress == pcNetworkInfo.hostBtMacAddress) {
                     val connUUID = UUID.fromString(pcNetworkInfo.hostBtUuid)
-                    val socket = device.createInsecureRfcommSocketToServiceRecord(connUUID)
-                    socket.connect()
-                    outputStream = socket.outputStream
-                    intputStream = socket.inputStream
+                    btSocket = device.createInsecureRfcommSocketToServiceRecord(connUUID)
+                    btSocket!!.connect()
+                    outputStream = btSocket!!.outputStream
+                    inputStream = btSocket!!.inputStream
                 }
             }
             // TODO: pairing
@@ -61,7 +62,7 @@ class PcCommunicator(val pcNetworkInfo: PcNetworkInfo) {
     }
 
     fun readEncrypted(aes256Key: ByteArray) : ByteArray {
-        val dis = DataInputStream(intputStream)
+        val dis = DataInputStream(inputStream)
 
         val iv = ByteArray(16)
         dis.readFully(iv)
@@ -73,5 +74,10 @@ class PcCommunicator(val pcNetworkInfo: PcNetworkInfo) {
         val result = ByteArray(msgLen)
         dis.readFully(result)
         return EncryptionUtils.decryptDataWithAes256(result, aes256Key, iv)
+    }
+
+    fun close() {
+        btSocket?.close()
+        tcpSocket?.close()
     }
 }
