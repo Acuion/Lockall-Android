@@ -79,126 +79,128 @@ class MainActivity : Activity() {
             return@launch
         }
 
-        when (prefix) {
-            QrType.STORE.prefix -> {
-                // store
-                val qrContent = gson.fromJson(userDataJson, MessageWithPassword::class.java)!!
+        authUser {
+            when (prefix) {
+                QrType.STORE.prefix -> {
+                    // store
+                    val qrContent = gson.fromJson(userDataJson, MessageWithPassword::class.java)!!
 
-                val usedResourceid = overrideResourceId
-                        ?: qrContent.resourceid
+                    val usedResourceid = overrideResourceId
+                            ?: qrContent.resourceid
 
-                val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
-                val pjo = ejsm.data
-                val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
+                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
+                    val pjo = ejsm.data
+                    val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
 
-                if (storage == null) {
-                    issueToast("Failed to read the storage")
-                    return@launch
-                }
-                var currentProfiles = storage.getProfilesForResource(usedResourceid)
-                if (currentProfiles == null)
-                    currentProfiles = Array(0) { _ -> "" }
-                selectProfile(usedResourceid, currentProfiles,
-                        true) {
-                    storage.put(usedResourceid, it, qrContent.password)
-                    try {
-                        ejsm.data = gson.toJsonTree(storage).asJsonObject
-                    } catch (ex: Exception) {
-                        ex.printStackTrace()
-                        issueToast("Failed to save updated storage")
-                        return@selectProfile
+                    if (storage == null) {
+                        issueToast("Failed to read the storage")
+                        return@authUser
                     }
+                    var currentProfiles = storage.getProfilesForResource(usedResourceid)
+                    if (currentProfiles == null)
+                        currentProfiles = Array(0) { _ -> "" }
+                    selectProfile(usedResourceid, currentProfiles,
+                            true) {
+                        storage.put(usedResourceid, it, qrContent.password)
+                        try {
+                            ejsm.data = gson.toJsonTree(storage).asJsonObject
+                        } catch (ex: Exception) {
+                            ex.printStackTrace()
+                            issueToast("Failed to save updated storage")
+                            return@selectProfile
+                        }
 
-                    val message = NetworkMessage(keyStructure.key,
-                            gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
-                    try {
-                        pcComm.send(message)
-                    } catch (ex: Exception) {
-                        issueToast("Feedback failed: ${ex.localizedMessage}")
-                        return@selectProfile
-                    }
-                }
-            }
-            QrType.PULL.prefix -> {
-                // pull password
-                val qrContent = gson.fromJson(userDataJson, MessageWithResourceid::class.java)!!
-
-                val usedResourceid = overrideResourceId
-                        ?: qrContent.resourceid
-
-                val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
-                val pjo = ejsm.data
-                val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
-
-                if (storage == null) {
-                    issueToast("Failed to read the storage")
-                    return@launch
-                }
-
-                val currentProfiles = storage.getProfilesForResource(usedResourceid)
-                if (currentProfiles == null) {
-                    issueToast("Nothing to send")
-                    return@launch
-                }
-                selectProfile(usedResourceid, currentProfiles,
-                        false) {
-
-                    val pass = storage.getPass(usedResourceid, it)!!
-                    val message = NetworkMessage(keyStructure.key,
-                            gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
-                    try {
-                        pcComm.send(message)
-                    } catch (ex: Exception) {
-                        issueToast("Feedback failed: ${ex.localizedMessage}")
-                        return@selectProfile
+                        val message = NetworkMessage(keyStructure.key,
+                                gson.toJsonTree(MessageStatus("Stored")).asJsonObject)
+                        try {
+                            pcComm.send(message)
+                        } catch (ex: Exception) {
+                            issueToast("Feedback failed: ${ex.localizedMessage}")
+                            return@selectProfile
+                        }
                     }
                 }
-            }
-            QrType.OTP.prefix -> {
-                // pull otp
+                QrType.PULL.prefix -> {
+                    // pull password
+                    val qrContent = gson.fromJson(userDataJson, MessageWithResourceid::class.java)!!
 
-                val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.OtpsStorage)
-                val pjo = ejsm.data
-                if (pjo == null) {
-                    issueToast("Failed to read the storage")
-                    return@launch
-                }
-                val storage = gson.fromJson(pjo, OtpDataStorage::class.java)
-                val currentProfiles = storage.getIssuerProfileKeys()
-                if (currentProfiles.isEmpty()) {
-                    issueToast("Nothing to send")
-                    return@launch
-                }
-                // TODO("resource name")
-                selectProfile("OTP", currentProfiles,
-                        false) {
-                    val secret = storage.getSecretFrom(it)
-                    val currTime = (System.currentTimeMillis() / 1000) / 30 // 30 sec period
+                    val usedResourceid = overrideResourceId
+                            ?: qrContent.resourceid
 
-                    val secretBytes = Base32().decode(secret)
-                    val timeBytes = ByteBuffer.allocate(8)
-                    timeBytes.putLong(currTime)
-                    val hmacBytes = EncryptionUtils.hmacSha1(timeBytes.array(), secretBytes)
-                    val offset = (hmacBytes.last() and 0x0F).toInt()
-                    val res1 = (hmacBytes[offset]).toInt().and(0x7F).shl(24)
-                    val res2 = (hmacBytes[offset + 1]).toInt().and(0xFF).shl(16)
-                    val res3 = (hmacBytes[offset + 2]).toInt().and(0xFF).shl(8)
-                    val res4 = (hmacBytes[offset + 3]).toInt().and(0xFF)
-                    val result = res1.or(res2).or(res3).or(res4)
-                    val pass = (result.rem(1000000)).toString().padStart(6, '0')
+                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.PasswordsStorage)
+                    val pjo = ejsm.data
+                    val storage = if (pjo == null) null else gson.fromJson(pjo, PasswordsStorage::class.java)
 
-                    val message = NetworkMessage(keyStructure.key,
-                            gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
-                    try {
-                        pcComm.send(message)
-                    } catch (ex: Exception) {
-                        issueToast("Feedback failed: ${ex.localizedMessage}")
-                        return@selectProfile
+                    if (storage == null) {
+                        issueToast("Failed to read the storage")
+                        return@authUser
+                    }
+
+                    val currentProfiles = storage.getProfilesForResource(usedResourceid)
+                    if (currentProfiles == null) {
+                        issueToast("Nothing to send")
+                        return@authUser
+                    }
+                    selectProfile(usedResourceid, currentProfiles,
+                            false) {
+
+                        val pass = storage.getPass(usedResourceid, it)!!
+                        val message = NetworkMessage(keyStructure.key,
+                                gson.toJsonTree(MessageWithPassword(usedResourceid, pass)).asJsonObject)
+                        try {
+                            pcComm.send(message)
+                        } catch (ex: Exception) {
+                            issueToast("Feedback failed: ${ex.localizedMessage}")
+                            return@selectProfile
+                        }
                     }
                 }
-            }
-            else -> {
-                issueToast("Unrecognized QR type")
+                QrType.OTP.prefix -> {
+                    // pull otp
+
+                    val ejsm = EncryptedJsonStorageManager(applicationContext, EncryptedJsonStorageManager.Filename.OtpsStorage)
+                    val pjo = ejsm.data
+                    if (pjo == null) {
+                        issueToast("Failed to read the storage")
+                        return@authUser
+                    }
+                    val storage = gson.fromJson(pjo, OtpDataStorage::class.java)
+                    val currentProfiles = storage.getIssuerProfileKeys()
+                    if (currentProfiles.isEmpty()) {
+                        issueToast("Nothing to send")
+                        return@authUser
+                    }
+                    // TODO("resource name")
+                    selectProfile("OTP", currentProfiles,
+                            false) {
+                        val secret = storage.getSecretFrom(it)
+                        val currTime = (System.currentTimeMillis() / 1000) / 30 // 30 sec period
+
+                        val secretBytes = Base32().decode(secret)
+                        val timeBytes = ByteBuffer.allocate(8)
+                        timeBytes.putLong(currTime)
+                        val hmacBytes = EncryptionUtils.hmacSha1(timeBytes.array(), secretBytes)
+                        val offset = (hmacBytes.last() and 0x0F).toInt()
+                        val res1 = (hmacBytes[offset]).toInt().and(0x7F).shl(24)
+                        val res2 = (hmacBytes[offset + 1]).toInt().and(0xFF).shl(16)
+                        val res3 = (hmacBytes[offset + 2]).toInt().and(0xFF).shl(8)
+                        val res4 = (hmacBytes[offset + 3]).toInt().and(0xFF)
+                        val result = res1.or(res2).or(res3).or(res4)
+                        val pass = (result.rem(1000000)).toString().padStart(6, '0')
+
+                        val message = NetworkMessage(keyStructure.key,
+                                gson.toJsonTree(MessageWithPassword("OTP", pass)).asJsonObject)
+                        try {
+                            pcComm.send(message)
+                        } catch (ex: Exception) {
+                            issueToast("Feedback failed: ${ex.localizedMessage}")
+                            return@selectProfile
+                        }
+                    }
+                }
+                else -> {
+                    issueToast("Unrecognized QR type")
+                }
             }
         }
     }
@@ -226,24 +228,27 @@ class MainActivity : Activity() {
             issueToast("Error parsing OTP QR")
             return@launch
         }
-        val otpEjsm = EncryptedJsonStorageManager(applicationContext,
-                EncryptedJsonStorageManager.Filename.OtpsStorage)
-        val otpsStorageJson = otpEjsm.data
-        if (otpsStorageJson == null) {
-            issueToast("Cannot load OTPs storage")
-            return@launch
-        }
-        val otpsStorage = gson.fromJson(otpsStorageJson, OtpDataStorage::class.java)
-        otpsStorage.put(issuer, account, secret.toUpperCase())
 
-        try {
-            otpEjsm.data = gson.toJsonTree(otpsStorage).asJsonObject
-        } catch (ex: Exception) {
-            issueToast("Failed to save updated storage")
-            return@launch
-        }
+        authUser {
+            val otpEjsm = EncryptedJsonStorageManager(applicationContext,
+                    EncryptedJsonStorageManager.Filename.OtpsStorage)
+            val otpsStorageJson = otpEjsm.data
+            if (otpsStorageJson == null) {
+                issueToast("Cannot load OTPs storage")
+                return@authUser
+            }
+            val otpsStorage = gson.fromJson(otpsStorageJson, OtpDataStorage::class.java)
+            otpsStorage.put(issuer, account, secret.toUpperCase())
 
-        issueToast("OTP generator stored for $account from $issuer")
+            try {
+                otpEjsm.data = gson.toJsonTree(otpsStorage).asJsonObject
+            } catch (ex: Exception) {
+                issueToast("Failed to save updated storage")
+                return@authUser
+            }
+
+            issueToast("OTP generator stored for $account from $issuer")
+        }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -261,16 +266,14 @@ class MainActivity : Activity() {
             }
 
             RequestCodeEnum.ScanQr.code -> {
-                authUser {
-                    when (data!!.getStringExtra("mode")!!) {
-                        ScanQrActivity.QrScanMode.LOCKALL.mode -> {
-                            processLockallQr(data.getStringExtra("data")!!,
-                                    data.getStringExtra("prefix")!!,
-                                    data.getStringExtra("overrideResourceid"))
-                        }
-                        ScanQrActivity.QrScanMode.OTP.mode -> {
-                            processOtpQr(data.getStringExtra("data")!!)
-                        }
+                when (data!!.getStringExtra("mode")!!) {
+                    ScanQrActivity.QrScanMode.LOCKALL.mode -> {
+                        processLockallQr(data.getStringExtra("data")!!,
+                                data.getStringExtra("prefix")!!,
+                                data.getStringExtra("overrideResourceid"))
+                    }
+                    ScanQrActivity.QrScanMode.OTP.mode -> {
+                        processOtpQr(data.getStringExtra("data")!!)
                     }
                 }
             }
