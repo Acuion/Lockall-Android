@@ -346,5 +346,10 @@ class MainActivity : Activity() {
         buttonOtp.setOnClickListener {
             launchQrActivity(ScanQrActivity.QrScanMode.OTP)
         }
+
+        buttonHelp.setOnClickListener {
+            val intent = Intent(this, OnboardingActivity::class.java)
+            startActivity(intent)
+        }
     }
 }
